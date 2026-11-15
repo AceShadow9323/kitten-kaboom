@@ -19,6 +19,7 @@ test('standalone HTML, art, health and API do not require ChatGPT or platform au
   const {base,call}=await setup(t);
   const root=await fetch(base);assert.equal(root.status,200);const body=await root.text();assert.ok(body.includes('Party Pack'));assert.ok(!/signin-with-chatgpt|OAI-Sites-Authorization|chatgpt\.site/i.test(body));
   const art=await fetch(base+'/art/back.jpg');assert.equal(art.status,200);assert.equal(art.headers.get('content-type'),'image/jpeg');
+  for(const key of ['originalbox','partybox']){const image=await fetch(base+'/art/'+key+'.png');assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');const bytes=new Uint8Array(await image.arrayBuffer());assert.equal(bytes[0],137);assert.equal(bytes[1],80)}
   assert.equal((await call('/healthz')).data.ok,true);
   assert.equal((await call('/api/create',randomUUID(),{name:'Alice',mode:'party'})).status,200);
   assert.equal((await call('/api/create','bad',{name:'Bad'})).status,401);

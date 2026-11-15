@@ -44,11 +44,12 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         await store.health(); reply(res, 200, {ok: true}); return;
       }
       if (url.pathname === '/' && ['GET', 'HEAD'].includes(req.method)) { reply(res, 200, req.method === 'HEAD' ? '' : html, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache'}); return; }
-      const artwork = /^\/art\/([a-z]+)\.jpg$/.exec(url.pathname);
+      const artwork = /^\/art\/([a-z]+)\.(jpg|png)$/.exec(url.pathname);
       if (artwork && ['GET','HEAD'].includes(req.method)) {
-        let bytes = assets.get(artwork[1]);
-        if (!bytes) { try { bytes = await readFile(new URL(artwork[1] + '.jpg', ART_DIR)); } catch (e) { if (e.code === 'ENOENT') throw new HttpError(404, 'Card image not found.'); throw e; } assets.set(artwork[1], bytes); }
-        reply(res, 200, req.method === 'HEAD' ? '' : bytes, {'content-type': 'image/jpeg', 'cache-control': 'public, max-age=86400'}); return;
+        const assetName = artwork[1]+'.'+artwork[2];
+        let bytes = assets.get(assetName);
+        if (!bytes) { try { bytes = await readFile(new URL(assetName, ART_DIR)); } catch (e) { if (e.code === 'ENOENT') throw new HttpError(404, 'Card image not found.'); throw e; } assets.set(assetName, bytes); }
+        reply(res, 200, req.method === 'HEAD' ? '' : bytes, {'content-type': artwork[2]==='png'?'image/png':'image/jpeg', 'cache-control': 'public, max-age=86400'}); return;
       }
       const path = url.pathname;
       if (!['/api/create', '/api/join', '/api/move', '/api/state'].includes(path)) throw new HttpError(404, 'Not found.');
