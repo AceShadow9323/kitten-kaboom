@@ -1,0 +1,27 @@
+# Optional database deployment. Select this Blueprint path explicitly.
+# Render's free PostgreSQL database expires 30 days after creation.
+# Choose a paid database yourself in Render if you need permanent storage.
+services:
+  - type: web
+    name: kitten-kaboom
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ROOM_STORE
+        value: postgres
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kitten-kaboom-db
+          property: connectionString
+databases:
+  - name: kitten-kaboom-db
+    plan: free
+    databaseName: kitten_kaboom
+    user: kitten_kaboom

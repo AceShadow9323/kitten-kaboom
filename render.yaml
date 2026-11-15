@@ -1,0 +1,16 @@
+# Free single-instance deployment. Active rooms reset when Render restarts/spins down the service.
+services:
+  - type: web
+    name: kitten-kaboom
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ROOM_STORE
+        value: memory
+      - key: TRUST_PROXY
+        value: "1"
