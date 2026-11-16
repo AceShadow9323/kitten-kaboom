@@ -35,3 +35,42 @@ test('Party Pack games with 2–10 players and all new bot decisions reach a win
 
 test('all non-cat cards reject pairs and triples in both editions without discarding',()=>{for(const mode of ['original','party'])for(const card of ['defuse','attack','favor','nope','shuffle','skip','peek','targeted','alter','bottom'])for(const count of [2,3]){let r=make();r.mode=mode;start(r);r.players[0].hand=Array(count).fill(card);r.players[1].hand=['defuse'];const before=structuredClone(r);assert.throws(()=>action(r,'a',{action:'play',indices:Array.from({length:count},(_,i)=>i),target:'b',wanted:'defuse'},100),/Only Cat Cards/);assert.deepEqual(r,before,mode+' '+card+' '+count)}});
 test('all five cat types retain pairs/triples and two skips resolve individually under attack',()=>{for(const cat of ['tacocat','meloncat','potatocat','beardcat','rainbowcat'])for(const count of [2,3]){let r=make();start(r);r.players[0].hand=Array(count).fill(cat);r.players[1].hand=['defuse'];action(r,'a',{action:'play',indices:Array.from({length:count},(_,i)=>i),target:'b',wanted:'defuse'},100);assert.deepEqual(r.players[0].hand,['defuse'])}let r=make();start(r);r.players[0].hand=['attack'];r.players[1].hand=['skip','skip'];action(r,'a',{action:'play',index:0},100);assert.equal(r.owed,2);action(r,'b',{action:'play',index:0},200);assert.equal(r.turn,1);assert.equal(r.owed,1);action(r,'b',{action:'play',index:0},300);assert.equal(r.turn,0);assert.deepEqual(r.discard,['attack','skip','skip'])});
+
+test('host chooses timer, disabled timers stay off, and expired turns draw only once',()=>{
+  const r=make();assert.throws(()=>action(r,'b',{action:'settings',turnSeconds:60},0));
+  assert.throws(()=>action(r,'a',{action:'settings',turnSeconds:31},0));
+  action(r,'a',{action:'settings',turnSeconds:30},0);r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'},1000);
+  assert.equal(r.turnClock.deadline,31000);r.deck=['skip','skip','skip'];
+  assert.equal(advanceBots(r,30999),false);advanceBots(r,31000);
+  assert.equal(r.turn,1);assert.equal(r.turnClock.deadline,61000);assert.equal(r.deck.length,2);
+  advanceBots(r,31000);assert.equal(r.deck.length,2);
+  // A late click cannot play another action after its timer has already expired.
+  action(r,'b',{action:'draw'},61000);assert.equal(r.deck.length,1);assert.equal(r.turn,0);
+  r.phase='lobby';action(r,'a',{action:'settings',turnSeconds:0},62000);r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'},62000);
+  assert.equal(r.turnClock,undefined);advanceBots(r,999999);assert.equal(r.turn,0);
+});
+test('playing cards uses remaining time; Nope windows and end votes pause and resume it',()=>{
+  const r=make();r.turnSeconds=30;start(r,0);r.players[0].hand=['shuffle','skip'];r.players[1].hand=['nope'];
+  action(r,'a',{action:'play',index:0},10000);assert.equal(r.turnClock.paused,true);assert.equal(r.turnClock.remaining,20000);
+  advanceBots(r,18000);assert.equal(r.turnClock.paused,false);assert.equal(r.turnClock.deadline,38000);
+  action(r,'a',{action:'requestend'},20000);assert.equal(r.turnClock.remaining,18000);
+  action(r,'b',{action:'voteend',voteId:r.endVote.id,agree:false},25000);
+  assert.equal(r.turnClock.deadline,43000);assert.equal(r.turnClock.paused,false);
+  action(r,'a',{action:'requestend'},26000);advanceBots(r,56000);assert.equal(r.turnClock.deadline,73000);
+});
+test('attacked turns reset the clock for each owed draw and special decisions cannot stall',()=>{
+  const r=make();r.turnSeconds=30;start(r,0);r.players[0].hand=['attack'];r.players[1].hand=['defuse'];r.deck=['skip','skip','boom','skip'];
+  action(r,'a',{action:'play',index:0},1000);assert.equal(r.turn,1);assert.equal(r.owed,2);
+  advanceBots(r,31000);assert.equal(r.owed,1);assert.equal(r.turnClock.deadline,61000);
+  advanceBots(r,61000);assert.equal(r.turn,0);assert.equal(r.turnClock.deadline,91000);
+  r.players[0].hand=['defuse'];advanceBots(r,91000);assert.equal(r.pending,'a');assert.equal(r.turnClock.deadline,121000);
+  advanceBots(r,121000);assert.equal(r.pending,undefined);assert.equal(r.turn,1);assert.equal(r.deck.filter(c=>c==='boom').length,1);
+  // Favor time belongs to the recipient and never exposes a hand to opponents.
+  r.players[1].hand=['favor'];r.players[0].hand=['defuse','skip'];action(r,'b',{action:'play',index:0,target:'a'},122000);
+  assert.equal(view(r,'b').turnClock.actor,'player-0');advanceBots(r,152000);assert.equal(r.favor,undefined);assert.equal(r.players[1].hand.length,1);
+  r.players[1].hand=['alter'];action(r,'b',{action:'play',index:0},153000);const top=[...r.deck];advanceBots(r,183000);assert.equal(r.alter,undefined);assert.deepEqual(r.deck,top);
+});
+test('turn clock clears after ending a round and after an elimination wins the game',()=>{
+  const r=make();r.turnSeconds=30;start(r,0);action(r,'a',{action:'requestend'},1000);action(r,'b',{action:'voteend',voteId:r.endVote.id,agree:true},2000);assert.equal(r.turnClock,undefined);
+  r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'},3000);r.deck=['boom'];r.players[0].hand=[];advanceBots(r,33000);assert.equal(r.phase,'finished');assert.equal(r.turnClock,undefined);
+});

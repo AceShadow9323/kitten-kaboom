@@ -47,3 +47,16 @@ test('selected portraits render on the table and lobby only lets you edit your o
   assert.equal((s.node('#app').innerHTML.match(/id="changeAvatar"/g)||[]).length,1);
   assert.equal(typeof s.node('#changeAvatar').onclick,'function');
 });
+
+test('setup hides avatar button; lobby retains avatar editor and timer setting',()=>{
+  const s=selection(['skip']);vm.runInContext("room=null;location.pathname='/play';landing()",s.context);
+  assert.ok(!s.node('#app').innerHTML.includes('Change avatar'));assert.ok(!s.node('#app').innerHTML.includes('id="chooseAvatar"'));
+  vm.runInContext("room={code:'ABC234',host:id,phase:'lobby',turnSeconds:60,players:[{id,name:'Me',avatar:'owl',ready:false}],log:[]};last='';render()",s.context);
+  assert.equal(typeof s.node('#changeAvatar').onclick,'function');assert.ok(s.node('#controls').innerHTML.includes('id="turnSeconds"'));assert.equal(typeof s.node('#turnSeconds').onchange,'function');
+});
+test('active avatar has one countdown ring and seconds badge, with no timer when disabled',()=>{
+  const s=selection(['skip']);vm.runInContext("room.turnClock={actor:id,deadline:Date.now()+30000,seconds:30,paused:false};last='';render()",s.context);
+  const markup=s.node('#app').innerHTML;
+  assert.equal((markup.match(/class="clock-ring"/g)||[]).length,1);assert.equal((markup.match(/class="clock-badge"/g)||[]).length,1);assert.ok(markup.includes('pathLength="100"'));
+  vm.runInContext("room.turnClock=null;last='';render()",s.context);assert.ok(!s.node('#app').innerHTML.includes('class="clock-ring"'));
+});

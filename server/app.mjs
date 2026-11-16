@@ -72,7 +72,7 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         if (!['original','party'].includes(mode)) throw new HttpError(400, 'Choose Original or Party Pack.');
         for (let i=0; i<5; i++) {
           const code = [...randomBytes(6)].map(x=>ALPHABET[x % ALPHABET.length]).join('');
-          const room = {code, host: token, mode, phase: 'lobby', players: [{id:token, name, avatar:avatarId(body.avatar), ready:false}], log: [], rev: 0};
+          const room = {code, host: token, mode, turnSeconds:30, phase: 'lobby', players: [{id:token, name, avatar:avatarId(body.avatar), ready:false}], log: [], rev: 0};
           if (await store.create(room)) { reply(res,200,view(room,token)); return; }
         }
         throw new HttpError(503, 'Could not create a room. Please try again.');

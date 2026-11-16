@@ -88,3 +88,19 @@ test('avatars sync to everyone, validate choices, and survive starting and retur
   const ended=(await call('/api/move',b,{code,action:'voteend',voteId:vote.endVote.id,agree:true})).data;
   assert.equal(ended.phase,'lobby');assert.deepEqual(ended.players.map(p=>p.avatar),['owl','dino']);
 });
+
+test('HTTP timer settings synchronize, only host edits, and a state poll enforces expiry',async t=>{
+  const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();
+  const created=(await call('/api/create',a,{name:'Host'})).data,code=created.code;
+  assert.equal(created.turnSeconds,30);await call('/api/join',b,{code,name:'Friend'});
+  assert.equal((await call('/api/move',b,{code,action:'settings',turnSeconds:60})).status,400);
+  assert.equal((await call('/api/move',a,{code,action:'settings',turnSeconds:45})).status,400);
+  const settings=(await call('/api/move',a,{code,action:'settings',turnSeconds:60})).data;
+  assert.equal(settings.turnSeconds,60);for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});
+  const started=(await call('/api/move',a,{code,action:'start'})).data;
+  assert.equal(started.turnClock.actor,a);assert.equal(started.turnClock.seconds,60);assert.ok(started.turnClock.deadline>started.serverNow);
+  await store.withRoom(code,r=>{r.turnClock.deadline=Date.now()-100;r.deck=['skip','skip'];return {changed:true,reply:null}});
+  const state=(await call('/api/state?code='+code,b)).data;
+  assert.equal(state.turn,1);assert.equal(state.remaining,1);assert.equal(state.turnClock.actor,b);
+  assert.equal(state.players[0].hand,undefined);assert.equal((await call('/api/state?code='+code,a)).data.remaining,1);
+});
