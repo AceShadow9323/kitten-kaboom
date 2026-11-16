@@ -46,6 +46,6 @@ test('Favor travels from giver to requester, bottom draw lifts the deck, and Def
 test('See the Future uses a crystal ball without an eye, and every animation has its card name below it',async()=>{
   const p=preview({search:'?card=peek'});await p.load();const markup=p.node('#effects').innerHTML;
   assert.ok(markup.includes('class="crystal-art"'));assert.ok(markup.includes('class="crystal-clouds"'));assert.ok(!markup.includes('eye'));assert.ok(!markup.includes('<img'));
-  assert.ok(source.indexOf('id="effectTitle"')>source.indexOf('</section>'));
-  for(const type of types){await p.choose(type);assert.ok(p.node('#effectTitle').textContent.length>0);assert.ok(p.node('#effectTitle').textContent.includes(' · '));assert.ok(p.node('#effectTitle').textContent.toLowerCase().includes(type==='targeted'?'targeted':type==='peek'?'see the future':type==='alter'?'alter the future':type==='bottom'?'draw from bottom':type))}
+  assert.ok(source.indexOf('id="effectTitle"')<source.indexOf('</section>'));assert.ok(source.includes('class="effect-name" id="effectTitle"'));assert.ok(!source.includes('class="animation-name" id="effectTitle"'));
+  for(const type of types){await p.choose(type);assert.ok(p.node('#effectTitle').textContent.length>0);assert.ok(!p.node('#effectTitle').textContent.includes(' · '));assert.ok(p.node('#effectTitle').textContent.toLowerCase().includes(type==='targeted'?'targeted':type==='peek'?'see the future':type==='alter'?'alter the future':type==='bottom'?'draw from bottom':type))}
 });
