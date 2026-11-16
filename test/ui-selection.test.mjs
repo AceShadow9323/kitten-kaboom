@@ -74,3 +74,10 @@ test('host can toggle both table options in lobby and guests see their status',(
   assert.ok(s.node('#controls').innerHTML.includes('id="showDiscard" checked'));assert.equal(typeof s.node('#showDiscard').onchange,'function');assert.equal(typeof s.node('#showBombRisk').onchange,'function');
   vm.runInContext("room.host='player-1';last='';render()",s.context);assert.ok(s.node('#controls').innerHTML.includes('弃牌记录：开启 · 炸弹风险：关闭'));assert.ok(!s.node('#controls').innerHTML.includes('id="showDiscard"'));
 });
+
+test('winner banner uses the surviving player avatar even when names are identical',()=>{
+  const s=selection(['skip']);
+  vm.runInContext("room.phase='finished';room.winner='Same name';room.players[0].name='Same name';room.players[0].alive=false;room.players[0].avatar='shark';room.players[1].name='Same name';room.players[1].alive=true;room.players[1].avatar='owl';last='';render()",s.context);
+  const banner=s.node('#app').innerHTML.split('<div class="winner-table">')[1].split('<div class="game-notice"')[0];
+  assert.ok(banner.includes('class="winner-avatar"'));assert.ok(banner.includes('aria-label="Owl"'));assert.ok(!banner.includes('aria-label="Shark"'));assert.ok(!banner.includes('class="trophy"'));assert.ok(banner.includes('Same name wins!'));
+});
