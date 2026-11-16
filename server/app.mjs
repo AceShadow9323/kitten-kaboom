@@ -43,7 +43,7 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed.');
         await store.health(); reply(res, 200, {ok: true}); return;
       }
-      if (url.pathname === '/' && ['GET', 'HEAD'].includes(req.method)) { reply(res, 200, req.method === 'HEAD' ? '' : html, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache'}); return; }
+      if (['/','/play','/play/'].includes(url.pathname) && ['GET', 'HEAD'].includes(req.method)) { reply(res, 200, req.method === 'HEAD' ? '' : html, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache'}); return; }
       const artwork = /^\/art\/([a-z]+)\.(jpg|png)$/.exec(url.pathname);
       if (artwork && ['GET','HEAD'].includes(req.method)) {
         const assetName = artwork[1]+'.'+artwork[2];
