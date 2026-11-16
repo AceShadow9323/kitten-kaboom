@@ -19,7 +19,7 @@ test('standalone HTML, art, health and API do not require ChatGPT or platform au
   const {base,call}=await setup(t);
   const root=await fetch(base);assert.equal(root.status,200);const body=await root.text();assert.ok(body.includes('Party Pack'));assert.ok(!/signin-with-chatgpt|OAI-Sites-Authorization|chatgpt\.site/i.test(body));
   const art=await fetch(base+'/art/back.jpg');assert.equal(art.status,200);assert.equal(art.headers.get('content-type'),'image/jpeg');
-  for(const key of ['originalbox','partybox','launch']){const image=await fetch(base+'/art/'+key+'.png');assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');const bytes=new Uint8Array(await image.arrayBuffer());assert.equal(bytes[0],137);assert.equal(bytes[1],80)}
+  for(const key of ['originalbox','partybox','launch','avataranimals','avatarfood']){const image=await fetch(base+'/art/'+key+'.png');assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');const bytes=new Uint8Array(await image.arrayBuffer());assert.equal(bytes[0],137);assert.equal(bytes[1],80)}
   for(const path of ['/play','/play/','/play?room=ABC234']){const page=await fetch(base+path);assert.equal(page.status,200);assert.ok(page.headers.get('content-type').startsWith('text/html'))}
   assert.equal((await call('/healthz')).data.ok,true);
   assert.equal((await call('/api/create',randomUUID(),{name:'Alice',mode:'party'})).status,200);
@@ -69,4 +69,22 @@ test('standalone bots make progress on state polling and invalid actions roll ba
   const state=(await call('/api/state?code='+code,a)).data;assert.equal(state.turn,0);assert.equal(state.remaining,1);
   const before=state.rev;assert.equal((await call('/api/move',a,{code,action:'play',indices:[999]})).status,400);
   assert.equal((await call('/api/state?code='+code,a)).data.rev,before);
+});
+
+test('avatars sync to everyone, validate choices, and survive starting and returning to lobby',async t=>{
+  const {call}=await setup(t),a=randomUUID(),b=randomUUID();
+  assert.equal((await call('/api/create',a,{name:'Host',avatar:'<script>'})).status,400);
+  const {code}= (await call('/api/create',a,{name:'Host',avatar:'owl'})).data;
+  const joined=(await call('/api/join',b,{code,name:'Guest',avatar:'pizza'})).data;
+  assert.deepEqual(joined.players.map(p=>p.avatar),['owl','pizza']);
+  assert.equal((await call('/api/move',b,{code,action:'setavatar',avatar:'https://example.com/a.png'})).status,400);
+  await call('/api/move',b,{code,action:'setavatar',target:joined.players[0].id,avatar:'dino'});
+  assert.deepEqual((await call('/api/state?code='+code,a)).data.players.map(p=>p.avatar),['owl','dino']);
+  for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});
+  const playing=(await call('/api/move',a,{code,action:'start'})).data;
+  assert.deepEqual(playing.players.map(p=>p.avatar),['owl','dino']);
+  assert.equal((await call('/api/move',a,{code,action:'setavatar',avatar:'bear'})).status,400);
+  const vote=(await call('/api/move',a,{code,action:'requestend'})).data;
+  const ended=(await call('/api/move',b,{code,action:'voteend',voteId:vote.endVote.id,agree:true})).data;
+  assert.equal(ended.phase,'lobby');assert.deepEqual(ended.players.map(p=>p.avatar),['owl','dino']);
 });

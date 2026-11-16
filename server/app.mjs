@@ -1,3 +1,4 @@
+import {avatarId} from '../game/avatars.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
@@ -63,6 +64,7 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
       const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
       if (!TOKEN.test(token)) throw new HttpError(401, 'Missing player identity. Reload the game.');
       const body = req.method === 'POST' ? await readBody(req) : {};
+      if (['/api/create','/api/join'].includes(url.pathname)) { try { avatarId(body.avatar); } catch (e) { throw new HttpError(400,e.message); } }
       const name = typeof body.name === 'string' ? body.name.trim().slice(0,20) : '';
       if (path === '/api/create') {
         if (!name) throw new HttpError(400, 'Enter your nickname.');
@@ -70,7 +72,7 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         if (!['original','party'].includes(mode)) throw new HttpError(400, 'Choose Original or Party Pack.');
         for (let i=0; i<5; i++) {
           const code = [...randomBytes(6)].map(x=>ALPHABET[x % ALPHABET.length]).join('');
-          const room = {code, host: token, mode, phase: 'lobby', players: [{id:token, name, ready:false}], log: [], rev: 0};
+          const room = {code, host: token, mode, phase: 'lobby', players: [{id:token, name, avatar:avatarId(body.avatar), ready:false}], log: [], rev: 0};
           if (await store.create(room)) { reply(res,200,view(room,token)); return; }
         }
         throw new HttpError(503, 'Could not create a room. Please try again.');
@@ -88,7 +90,7 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
             if (!name) throw new HttpError(400, 'Enter your nickname.');
             if (room.phase !== 'lobby') throw new HttpError(400, 'This game has already started.');
             if (room.players.length >= maxPlayers(room)) throw new HttpError(400, 'This room is full.');
-            room.players.push({id: token, name, ready:false});
+            room.players.push({id: token, name, avatar:avatarId(body.avatar), ready:false});
           }
         } else if (body.action === 'leave') {
           if (room.phase === 'playing') throw new HttpError(400, 'Finish this round or request an end-round vote before leaving.');
