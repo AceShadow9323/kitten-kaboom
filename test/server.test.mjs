@@ -128,3 +128,12 @@ test('explosion preview has a public isolated link with autoplay and replay, wit
   const head=await fetch(base+'/preview/explosion',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
   const game=await (await fetch(base+'/play')).text();assert.ok(!game.includes('id="kaboom-explosion-preview"'));
 });
+
+test('an undefused elimination publishes the same explosion event to every player without leaking identity',async t=>{
+  const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'Host'})).data;
+  await call('/api/join',b,{code,name:'Guest'});await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+  await store.withRoom(code,r=>{r.players[0].hand=[];r.deck=['boom'];return {changed:true,reply:null}});
+  const eliminated=(await call('/api/move',a,{code,action:'draw'})).data;assert.equal(eliminated.phase,'finished');assert.equal(eliminated.explosions.length,1);assert.equal(eliminated.explosions[0].player,a);
+  const observer=(await call('/api/state?code='+code,b)).data;assert.equal(observer.explosions[0].id,eliminated.explosions[0].id);assert.equal(observer.explosions[0].player,'player-0');assert.ok(!JSON.stringify(observer).includes(a));
+  assert.deepEqual((await call('/api/state?code='+code,b)).data.explosions,observer.explosions);
+});

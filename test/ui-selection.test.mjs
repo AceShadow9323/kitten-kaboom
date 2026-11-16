@@ -4,15 +4,15 @@ import vm from 'node:vm';
 import {html} from '../game/ui.mjs';
 const PLAYER='11111111-1111-4111-8111-111111111111';
 function selection(hand,mode='party',navigation={}) {
-  const nodes=new Map();
+  const nodes=new Map(),timers=[];
   const make=s=>{if(!nodes.has(s))nodes.set(s,{innerHTML:'',textContent:'',value:'',style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(k,v){this[k]=v},insertAdjacentHTML(_,v){this.innerHTML+=v}});return nodes.get(s)};
   const cards=hand.map((_,i)=>({dataset:{index:String(i)},setAttribute(k,v){this[k]=v},closest(){return {classList:{toggle(){}}}}}));
   const modes=()=>[...make('#selection').innerHTML.matchAll(/data-combo-count="(\d)"/g)].map(m=>{const b=make('mode-'+m[1]);b.dataset={comboCount:m[1]};return b});
-  const context=vm.createContext({document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
+  const context=vm.createContext({document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},setTimeout(fn,ms){timers.push({fn,ms})},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
   const room={code:'ABC234',host:PLAYER,mode,phase:'playing',turn:0,owed:1,remaining:30,discard:[],log:[],players:[{id:PLAYER,name:'Me',alive:true,count:hand.length,hand},{id:'player-1',name:'Friend',alive:true,count:5}]};
   vm.runInContext('room='+JSON.stringify(room)+';render()',context);
-  return {context,cards,node:make,modes,selected:()=>JSON.parse(vm.runInContext('JSON.stringify(selected)',context))};
+  return {context,cards,node:make,modes,timers,selected:()=>JSON.parse(vm.runInContext('JSON.stringify(selected)',context))};
 }
 test('duplicate action cards never show pair/triple controls in either mode',()=>{
   for(const mode of ['original','party'])for(const c of ['defuse','attack','favor','nope','shuffle','skip','peek','targeted','alter','bottom']){
@@ -80,4 +80,30 @@ test('winner banner uses the surviving player avatar even when names are identic
   vm.runInContext("room.phase='finished';room.winner='Same name';room.players[0].name='Same name';room.players[0].alive=false;room.players[0].avatar='shark';room.players[1].name='Same name';room.players[1].alive=true;room.players[1].avatar='owl';last='';render()",s.context);
   const banner=s.node('#app').innerHTML.split('<div class="winner-table">')[1].split('<div class="game-notice"')[0];
   assert.ok(banner.includes('class="winner-avatar"'));assert.ok(banner.includes('aria-label="Owl"'));assert.ok(!banner.includes('aria-label="Shark"'));assert.ok(!banner.includes('class="trophy"'));assert.ok(banner.includes('Same name wins!'));
+});
+
+test('explosion snapshots skip old events on refresh, deduplicate polls and reset for a new round',()=>{
+  const s=selection(['skip']);
+  const evaluate=expression=>JSON.parse(vm.runInContext('JSON.stringify('+expression+')',s.context));
+  vm.runInContext('explosionSnapshot=null',s.context);
+  const first={code:'ROOM01',roundId:'r1',phase:'playing',explosions:[{id:'e1',player:PLAYER}]};
+  assert.deepEqual(evaluate('freshExplosions('+JSON.stringify(first)+')'),[]);
+  const next={...first,explosions:[...first.explosions,{id:'e2',player:'player-1'}]};
+  assert.deepEqual(evaluate('freshExplosions('+JSON.stringify(next)+')'),[{id:'e2',player:'player-1'}]);assert.deepEqual(evaluate('freshExplosions('+JSON.stringify(next)+')'),[]);
+  assert.deepEqual(evaluate('freshExplosions('+JSON.stringify({...next,code:'OTHER1'})+')'),[]);
+  evaluate('freshExplosions('+JSON.stringify({code:'ROOM01',roundId:'r1',phase:'lobby',explosions:[]})+')');
+  assert.deepEqual(evaluate('freshExplosions('+JSON.stringify({...first,roundId:'r2'})+')'),first.explosions);
+});
+test('game explosions use the eliminated avatar, survive polling, queue multiple events and clear on rematch',()=>{
+  const s=selection(['skip']);vm.runInContext("room.players[1].avatar='owl';room.players[1].name='<Mittens>';room.players[1].alive=false;room.explosions=[{id:'e1',player:'player-1'}];room.rev=1;last='';render()",s.context);
+  const effect=s.node('#explosionMount').innerHTML;assert.ok(effect.includes('game-explosion-burst'));assert.ok(effect.includes('aria-label="Owl"'));assert.ok(effect.includes('&lt;Mittens&gt; · 已出局'));assert.equal(s.timers.length,1);assert.equal(s.timers[0].ms,2900);
+  vm.runInContext('room.rev++;render()',s.context);assert.equal(s.timers.length,1);assert.equal(s.node('#explosionMount').innerHTML,effect);
+  vm.runInContext("room.players[0].avatar='dino';room.explosions.push({id:'e2',player:id});room.rev++;render()",s.context);assert.equal(s.timers.length,1);
+  s.timers[0].fn();assert.equal(s.timers.length,2);assert.ok(s.node('#explosionMount').innerHTML.includes('aria-label="Dinosaur"'));
+  vm.runInContext("room.phase='lobby';room.rev++;render()",s.context);assert.equal(s.node('#explosionMount').innerHTML,'');s.timers[1].fn();assert.equal(s.node('#explosionMount').innerHTML,'');
+});
+test('reduced motion shows a brief elimination message without explosion animation',()=>{
+  const s=selection(['skip']);vm.runInContext("globalThis.matchMedia=()=>({matches:true});room.explosions=[{id:'e1',player:'player-1'}];room.rev=1;last='';render()",s.context);
+  assert.ok(s.node('#explosionMount').innerHTML.includes('game-explosion-reduced'));assert.equal(s.timers[0].ms,700);assert.ok(s.node('#explosionStatus').textContent.includes('无法拆除'));
+  s.timers[0].fn();assert.equal(s.node('#explosionMount').innerHTML,'');
 });

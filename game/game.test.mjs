@@ -93,3 +93,18 @@ test('bomb risk tracks normal draws, pending Defuse, reinsertion and elimination
   r.players[2].hand=[];action(r,'c',{action:'draw'},3);assert.equal(r.players[2].alive,false);assert.equal(view(r,'a').bombRisk.percent,50);
   r.deck=['skip'];assert.equal(view(r,'a').bombRisk.percent,0);r.deck=['boom'];assert.equal(view(r,'a').bombRisk.percent,100);r.deck=[];assert.equal(view(r,'a').bombRisk.percent,0);
 });
+
+test('only undefused kittens emit unique public explosion events, including the final elimination',()=>{
+  const r=make();start(r);const round=r.roundId;r.deck=['boom','boom'];r.players[0].hand=['defuse'];r.players[1].hand=[];
+  action(r,'a',{action:'draw'});assert.equal(r.explosions.length,0);assert.equal(r.pending,'a');
+  action(r,'a',{action:'reinsert',position:1});action(r,'b',{action:'draw'});
+  assert.equal(r.phase,'finished');assert.equal(r.explosions.length,1);assert.equal(r.explosions[0].player,'b');
+  const own=view(r,'b').explosions[0],other=view(r,'a').explosions[0];assert.equal(own.player,'b');assert.equal(other.player,'player-1');assert.equal(own.id,other.id);
+  assert.deepEqual(view(r,'a').explosions,view(r,'a').explosions);
+  action(r,'a',{action:'rematch'});r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'});assert.notEqual(r.roundId,round);assert.deepEqual(r.explosions,[]);
+});
+test('bottom draws and timed-out draws also produce explosion events when no Defuse is available',()=>{
+  const r=make(3);r.mode='party';start(r);r.players.forEach(p=>p.hand=[]);r.players[0].hand=['bottom'];r.deck=['skip','boom'];
+  action(r,'a',{action:'play',index:0});assert.equal(r.explosions.length,1);assert.equal(r.explosions[0].player,'a');assert.equal(r.phase,'playing');
+  const timed=make();timed.turnSeconds=30;start(timed,0);timed.players[0].hand=[];timed.deck=['boom'];advanceBots(timed,30000);assert.equal(timed.explosions.length,1);assert.equal(timed.phase,'finished');
+});

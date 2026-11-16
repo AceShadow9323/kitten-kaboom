@@ -73,10 +73,10 @@
       if(button.disabled)return;const current=++run;
       root.classList.remove('ek-playing','ek-done');void root.offsetWidth;root.classList.add('ek-playing');button.disabled=true;message.textContent='抽到炸弹 · 没有 Defuse';name.textContent='Mittens';status.textContent='播放中…';
       setTimeout(()=>{if(current===run)message.textContent='Mittens 被炸出局！'},1400);
-      setTimeout(()=>{if(current!==run)return;root.classList.remove('ek-playing');root.classList.add('ek-done');name.textContent='Mittens · 已出局';status.textContent='预览结束 · 尚未加入游戏';button.disabled=false;button.textContent='再看一次'},3100);
+      setTimeout(()=>{if(current!==run)return;root.classList.remove('ek-playing');root.classList.add('ek-done');name.textContent='Mittens · 已出局';status.textContent='预览结束 · 可以再次播放';button.disabled=false;button.textContent='再看一次'},3100);
     });
     window.addEventListener('load',()=>setTimeout(()=>button.click(),250),{once:true});
   })();
   </script>
 </div>
-<p>仅供预览，尚未加入正式游戏。打开后自动播放，也可以点击“再看一次”重播。</p></main></body></html>
+<p>这是正式游戏中的炸弹淘汰特效预览。打开后自动播放，也可以点击“再看一次”重播。</p></main></body></html>
