@@ -137,3 +137,11 @@ test('an undefused elimination publishes the same explosion event to every playe
   const observer=(await call('/api/state?code='+code,b)).data;assert.equal(observer.explosions[0].id,eliminated.explosions[0].id);assert.equal(observer.explosions[0].player,'player-0');assert.ok(!JSON.stringify(observer).includes(a));
   assert.deepEqual((await call('/api/state?code='+code,b)).data.explosions,observer.explosions);
 });
+
+test('card effect previews have their own public URL, without adding action animations to gameplay',async t=>{
+  const {base}=await setup(t);
+  for(const path of ['/preview/cards','/preview/cards/','/preview/cards?card=defuse']){const response=await fetch(base+path);assert.equal(response.status,200);assert.ok(response.headers.get('content-type').startsWith('text/html'));const page=await response.text();assert.ok(page.includes('id="cardSelect"'));assert.ok(page.includes('连续预览全部'));assert.ok(page.includes('TARGET LOCKED'));assert.ok(page.includes('DEFUSED ✓'));assert.ok(!page.includes('fetch('))}
+  const head=await fetch(base+'/preview/cards',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');assert.equal((await fetch(base+'/preview/toString')).status,404);
+  for(const card of ['nope','attack','targeted','alter','peek','shuffle','skip','favor','bottom','defuse'])assert.equal((await fetch(base+'/art/'+card+'.jpg',{method:'HEAD'})).status,200);
+  const game=await (await fetch(base+'/play')).text();assert.ok(!game.includes('id="cardSelect"'));assert.ok(!game.includes('TARGET LOCKED'));
+});
