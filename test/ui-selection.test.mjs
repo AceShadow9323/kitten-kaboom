@@ -60,3 +60,17 @@ test('active avatar has one countdown ring and seconds badge, with no timer when
   assert.equal((markup.match(/class="clock-ring"/g)||[]).length,1);assert.equal((markup.match(/class="clock-badge"/g)||[]).length,1);assert.ok(markup.includes('pathLength="100"'));
   vm.runInContext("room.turnClock=null;last='';render()",s.context);assert.ok(!s.node('#app').innerHTML.includes('class="clock-ring"'));
 });
+
+test('discard history opens newest first only when enabled; bomb risk gauge follows its own setting',()=>{
+  const s=selection(['skip']);let opened=0;s.node('#discardHistory').showModal=()=>opened++;
+  vm.runInContext("room.discard=['attack','skip','nope'];room.discardCount=3;room.showDiscard=true;room.showBombRisk=true;room.bombRisk={percent:25,bombs:1,total:4};last='';render()",s.context);
+  assert.ok(s.node('#app').innerHTML.includes('BOMB RISK · 炸弹风险'));assert.ok(s.node('#app').innerHTML.includes('25.0%'));assert.ok(s.node('#app').innerHTML.includes('DISCARD · 3 · VIEW'));
+  s.node('#discardInspect').onclick();assert.equal(opened,1);const list=s.node('#discardCards').innerHTML;assert.ok(list.indexOf('/art/nope.jpg')<list.indexOf('/art/skip.jpg'));assert.ok(list.indexOf('/art/skip.jpg')<list.indexOf('/art/attack.jpg'));
+  vm.runInContext("room.showDiscard=false;room.showBombRisk=false;room.bombRisk=null;last='';render();openDiscardHistory()",s.context);
+  assert.equal(opened,1);assert.ok(!s.node('#app').innerHTML.includes('BOMB RISK · 炸弹风险'));assert.ok(!s.node('#app').innerHTML.includes('VIEW ↗'));
+});
+test('host can toggle both table options in lobby and guests see their status',()=>{
+  const s=selection(['skip']);vm.runInContext("room.phase='lobby';room.showDiscard=true;room.showBombRisk=false;last='';render()",s.context);
+  assert.ok(s.node('#controls').innerHTML.includes('id="showDiscard" checked'));assert.equal(typeof s.node('#showDiscard').onchange,'function');assert.equal(typeof s.node('#showBombRisk').onchange,'function');
+  vm.runInContext("room.host='player-1';last='';render()",s.context);assert.ok(s.node('#controls').innerHTML.includes('弃牌记录：开启 · 炸弹风险：关闭'));assert.ok(!s.node('#controls').innerHTML.includes('id="showDiscard"'));
+});

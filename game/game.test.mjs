@@ -74,3 +74,22 @@ test('turn clock clears after ending a round and after an elimination wins the g
   const r=make();r.turnSeconds=30;start(r,0);action(r,'a',{action:'requestend'},1000);action(r,'b',{action:'voteend',voteId:r.endVote.id,agree:true},2000);assert.equal(r.turnClock,undefined);
   r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'},3000);r.deck=['boom'];r.players[0].hand=[];advanceBots(r,33000);assert.equal(r.phase,'finished');assert.equal(r.turnClock,undefined);
 });
+
+test('discard history and bomb risk are separate host-only lobby options, off by default',()=>{
+  const r=make();start(r,0);r.deck=['skip','boom','skip'];r.discard=['attack','skip','nope'];
+  let v=view(r,'a');assert.equal(v.showDiscard,false);assert.deepEqual(v.discard,['nope']);assert.equal(v.discardCount,3);assert.equal(v.bombRisk,null);assert.equal(v.deck,undefined);
+  assert.throws(()=>action(r,'a',{action:'settings',showDiscard:true},0));r.phase='lobby';
+  assert.throws(()=>action(r,'b',{action:'settings',showDiscard:true},0));assert.throws(()=>action(r,'a',{action:'settings',showBombRisk:'true'},0));
+  action(r,'a',{action:'settings',showDiscard:true},0);v=view(r,'b');assert.deepEqual(v.discard,['attack','skip','nope']);assert.equal(v.bombRisk,null);
+  action(r,'a',{action:'settings',showDiscard:false,showBombRisk:true},0);r.phase='playing';v=view(r,'b');assert.deepEqual(v.discard,['nope']);assert.equal(v.bombRisk.percent,100/3);
+  assert.deepEqual(v.bombRisk,view(r,'a').bombRisk);assert.equal(v.deck,undefined);assert.equal(v.players[0].hand,undefined);
+});
+test('bomb risk tracks normal draws, pending Defuse, reinsertion and elimination without revealing order',()=>{
+  const r=make(3);r.showBombRisk=true;start(r,0);r.deck=['boom','skip','boom','skip'];r.players[0].hand=['defuse'];
+  assert.equal(view(r,'a').bombRisk.percent,50);
+  action(r,'a',{action:'draw'},0);assert.equal(r.pending,'a');assert.equal(view(r,'a').bombRisk.percent,100/3);
+  action(r,'a',{action:'reinsert',position:3},1);assert.equal(view(r,'a').bombRisk.percent,50);
+  action(r,'b',{action:'draw'},2);assert.equal(view(r,'a').bombRisk.percent,200/3);
+  r.players[2].hand=[];action(r,'c',{action:'draw'},3);assert.equal(r.players[2].alive,false);assert.equal(view(r,'a').bombRisk.percent,50);
+  r.deck=['skip'];assert.equal(view(r,'a').bombRisk.percent,0);r.deck=['boom'];assert.equal(view(r,'a').bombRisk.percent,100);r.deck=[];assert.equal(view(r,'a').bombRisk.percent,0);
+});

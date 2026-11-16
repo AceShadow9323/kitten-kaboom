@@ -104,3 +104,17 @@ test('HTTP timer settings synchronize, only host edits, and a state poll enforce
   assert.equal(state.turn,1);assert.equal(state.remaining,1);assert.equal(state.turnClock.actor,b);
   assert.equal(state.players[0].hand,undefined);assert.equal((await call('/api/state?code='+code,a)).data.remaining,1);
 });
+
+test('HTTP table options gate discard history and aggregate bomb risk for both players',async t=>{
+  const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();
+  const {code}= (await call('/api/create',a,{name:'Host'})).data;await call('/api/join',b,{code,name:'Guest'});
+  assert.equal((await call('/api/move',b,{code,action:'settings',showBombRisk:true})).status,400);
+  assert.equal((await call('/api/move',a,{code,action:'settings',showDiscard:'yes'})).status,400);
+  await call('/api/move',a,{code,action:'settings',showDiscard:true,showBombRisk:true,turnSeconds:0});
+  for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+  await store.withRoom(code,r=>{r.deck=['boom','skip','skip','skip'];r.discard=['attack','skip','nope'];return {changed:true,reply:null}});
+  for(const who of [a,b]){const v=(await call('/api/state?code='+code,who)).data;assert.deepEqual(v.discard,['attack','skip','nope']);assert.equal(v.bombRisk.percent,25);assert.equal(v.deck,undefined)}
+  assert.equal((await call('/api/move',a,{code,action:'settings',showDiscard:false})).status,400);
+  await store.withRoom(code,r=>{r.showDiscard=false;r.showBombRisk=false;return {changed:true,reply:null}});
+  const hidden=(await call('/api/state?code='+code,b)).data;assert.deepEqual(hidden.discard,['nope']);assert.equal(hidden.discardCount,3);assert.equal(hidden.bombRisk,null);
+});
