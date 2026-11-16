@@ -118,3 +118,13 @@ test('HTTP table options gate discard history and aggregate bomb risk for both p
   await store.withRoom(code,r=>{r.showDiscard=false;r.showBombRisk=false;return {changed:true,reply:null}});
   const hidden=(await call('/api/state?code='+code,b)).data;assert.deepEqual(hidden.discard,['nope']);assert.equal(hidden.discardCount,3);assert.equal(hidden.bombRisk,null);
 });
+
+test('explosion preview has a public isolated link with autoplay and replay, without changing game UI',async t=>{
+  const {base}=await setup(t);
+  for(const path of ['/preview/explosion','/preview/explosion/']){
+    const response=await fetch(base+path);assert.equal(response.status,200);assert.ok(response.headers.get('content-type').startsWith('text/html'));
+    const page=await response.text();assert.ok(page.startsWith('<!doctype html>'));assert.ok(page.includes('id="kaboom-explosion-preview"'));assert.ok(page.includes("window.addEventListener('load'"));assert.ok(page.includes('再看一次'));assert.ok(page.includes('/art/boom.jpg'));assert.ok(!page.includes('fetch('));assert.ok(!page.includes('window.openai'));
+  }
+  const head=await fetch(base+'/preview/explosion',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+  const game=await (await fetch(base+'/play')).text();assert.ok(!game.includes('id="kaboom-explosion-preview"'));
+});

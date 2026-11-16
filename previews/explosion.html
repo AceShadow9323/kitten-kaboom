@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>爆炸特效预览 · Kitten Kaboom</title><meta name="robots" content="noindex"><link rel="preload" as="image" href="/art/avataranimals.png"><link rel="preload" as="image" href="/art/boom.jpg"><style>body{margin:0;background:#23090d;color:#fff1df;font:15px system-ui,sans-serif}main{max-width:760px;margin:0 auto;padding:28px 18px 40px}header{display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:24px}h1{font-size:22px;margin:0}a{color:#ffcc66;text-decoration:none;padding:10px 0}p{font-size:13px;line-height:1.7;color:#c49b98;margin:14px 0 0}a:focus-visible,button:focus-visible{outline:3px solid #ffcc66;outline-offset:5px}</style></head><body><main><header><h1>爆炸特效预览</h1><a href="/">返回游戏 ↗</a></header><div id="kaboom-explosion-preview" aria-label="炸弹爆炸特效预览">
+  <style>
+    #kaboom-explosion-preview{--ek-ink:#fff1df;--ek-gold:#ffcc66;--ek-muted:#c49b98;color:var(--ek-ink);font:15px system-ui,sans-serif}
+    #kaboom-explosion-preview *{box-sizing:border-box}
+    #kaboom-explosion-preview .ek-scene{position:relative;height:390px;overflow:hidden;border-radius:18px;background:radial-gradient(ellipse at 50% 30%,#651d2a,#260910 80%);isolation:isolate}
+    #kaboom-explosion-preview .ek-label{position:absolute;top:20px;left:22px;z-index:8;font-size:12px;letter-spacing:2px;color:var(--ek-muted)}
+    #kaboom-explosion-preview .ek-felt{position:absolute;inset:75px 28px 65px;border-radius:50%;background:radial-gradient(ellipse at 50% 35%,#922d3b,#561323);border:10px solid #4b252c;box-shadow:0 0 0 2px #a36b5c,0 14px 0 #22090f,inset 0 0 0 2px #cba07444,inset 0 0 40px #27090f66}
+    #kaboom-explosion-preview .ek-deck{position:absolute;left:24%;top:46%;transform:translate(-50%,-50%) rotate(-8deg);width:65px;height:91px;border:3px solid #f3d9b4;border-radius:7px;background:#a21e21;box-shadow:3px 4px 0 #b7846c,6px 8px 0 #e7cfa9;display:grid;place-content:center;text-align:center;font-size:9px;font-weight:700;line-height:1.3;color:#ffdf66}
+    #kaboom-explosion-preview .ek-card{position:absolute;left:50%;top:45%;width:96px;height:134px;transform:translate(-50%,-50%);z-index:3;perspective:700px}
+    #kaboom-explosion-preview .ek-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d}
+    #kaboom-explosion-preview .ek-card-front,#kaboom-explosion-preview .ek-card-back{position:absolute;inset:0;backface-visibility:hidden;border-radius:8px;box-shadow:0 12px 20px #1a040a88}
+    #kaboom-explosion-preview .ek-card-front{width:100%;height:100%;transform:rotateY(180deg);object-fit:fill}
+    #kaboom-explosion-preview .ek-card-back{background:#a32127;border:4px solid #f3d9b4;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:10px;font-weight:700;font-size:14px;color:#fff1df}
+    #kaboom-explosion-preview .ek-card-back span{color:#ffdc67;font-size:24px}
+    #kaboom-explosion-preview .ek-person{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;z-index:4}
+    #kaboom-explosion-preview .ek-avatar{width:68px;height:68px;border:3px solid var(--ek-gold);border-radius:50%;margin:auto auto 8px;background-image:url('/art/avataranimals.png');background-size:439.4737% 239.4737%;background-position:48.8372% 77.3585%;box-shadow:0 0 22px #ffcc6644}
+    #kaboom-explosion-preview .ek-name{display:inline-block;padding:5px 14px;border-radius:20px;background:#260710;color:var(--ek-gold);font-size:12px;font-weight:600}
+    #kaboom-explosion-preview .ek-message{position:absolute;top:24px;left:50%;transform:translateX(-50%);white-space:nowrap;color:var(--ek-gold);font-size:13px;z-index:9}
+    #kaboom-explosion-preview .ek-effects{position:absolute;left:50%;top:45%;width:0;height:0;z-index:6;pointer-events:none}
+    #kaboom-explosion-preview .ek-burst{position:absolute;width:180px;height:180px;left:-90px;top:-90px;background:#ffd166;clip-path:polygon(50% 0,59% 25%,79% 7%,76% 32%,100% 29%,82% 48%,100% 65%,73% 68%,79% 95%,57% 79%,42% 100%,34% 74%,7% 82%,23% 57%,0 44%,27% 35%,23% 10%,44% 26%);opacity:0}
+    #kaboom-explosion-preview .ek-burst:after{content:'';position:absolute;inset:25px;background:#ff784b;clip-path:inherit}
+    #kaboom-explosion-preview .ek-ring{position:absolute;left:-15px;top:-15px;width:30px;height:30px;border:3px solid #ffdf8e;border-radius:50%;opacity:0}
+    #kaboom-explosion-preview .ek-particle{position:absolute;width:8px;height:14px;left:-4px;top:-7px;background:var(--spark);border-radius:3px;opacity:0}
+    #kaboom-explosion-preview .ek-smoke{position:absolute;width:72px;height:65px;border-radius:50%;left:-36px;top:-32px;background:radial-gradient(circle at 40% 30%,#b18d8d,#4b2939);opacity:0;filter:blur(3px)}
+    #kaboom-explosion-preview .ek-boom-word{position:absolute;left:-100px;top:-25px;width:200px;text-align:center;font-size:35px;font-weight:800;letter-spacing:2px;transform:rotate(-9deg);color:#fff1df;text-shadow:3px 3px 0 #922d3b;opacity:0;z-index:8}
+    #kaboom-explosion-preview .ek-controls{display:flex;justify-content:center;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+    #kaboom-explosion-preview .ek-play{padding:12px 24px;min-height:44px;background:#ffcc66;color:#32100d;border:0;border-radius:9px;font:600 14px system-ui,sans-serif;cursor:pointer}
+    #kaboom-explosion-preview .ek-play:disabled{opacity:.6;cursor:default}
+    #kaboom-explosion-preview .ek-state{font-size:12px;color:var(--ek-muted)}
+    #kaboom-explosion-preview.ek-playing .ek-card-inner{animation:ek-flip .45s .15s ease forwards}
+    #kaboom-explosion-preview.ek-playing .ek-card{animation:ek-tremble .6s .65s linear,ek-card-vanish .2s 1.25s ease forwards}
+    #kaboom-explosion-preview.ek-playing .ek-felt{animation:ek-table-shake .35s 1.25s ease}
+    #kaboom-explosion-preview.ek-playing .ek-burst{animation:ek-burst .65s 1.2s ease-out forwards}
+    #kaboom-explosion-preview.ek-playing .ek-ring{animation:ek-ring .8s 1.25s ease-out forwards}
+    #kaboom-explosion-preview.ek-playing .ek-particle{animation:ek-spark 1s 1.25s cubic-bezier(.12,.55,.3,1) forwards}
+    #kaboom-explosion-preview.ek-playing .ek-smoke{animation:ek-smoke 1.7s 1.4s ease-out forwards}
+    #kaboom-explosion-preview.ek-playing .ek-boom-word{animation:ek-word 1.05s 1.3s ease-out forwards}
+    #kaboom-explosion-preview.ek-playing .ek-avatar{animation:ek-avatar-out .65s 1.4s ease forwards}
+    #kaboom-explosion-preview.ek-done .ek-avatar{filter:grayscale(1);opacity:.4;transform:scale(.9);border-color:#906b74;box-shadow:none}
+    #kaboom-explosion-preview.ek-done .ek-name{color:#c49b98}
+    #kaboom-explosion-preview.ek-done .ek-card{opacity:0}
+    @keyframes ek-flip{to{transform:rotateY(180deg)}}
+    @keyframes ek-tremble{0%,100%{transform:translate(-50%,-50%) rotate(0)}20%,60%{transform:translate(-54%,-50%) rotate(-7deg)}40%,80%{transform:translate(-46%,-50%) rotate(7deg)}}
+    @keyframes ek-card-vanish{to{opacity:0;transform:translate(-50%,-50%) scale(.25)}}
+    @keyframes ek-table-shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+    @keyframes ek-burst{0%{opacity:0;transform:scale(.2) rotate(-20deg)}20%{opacity:1}65%{opacity:1;transform:scale(1.4) rotate(12deg)}100%{opacity:0;transform:scale(1.6) rotate(20deg)}}
+    @keyframes ek-ring{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(11)}}
+    @keyframes ek-spark{0%{opacity:1;transform:translate(0,0) scale(.5)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.2)}}
+    @keyframes ek-smoke{0%{opacity:0;transform:scale(.3)}20%{opacity:.8}100%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(1.7)}}
+    @keyframes ek-word{0%{opacity:0;transform:scale(.3) rotate(-15deg)}20%,65%{opacity:1;transform:scale(1) rotate(-9deg)}100%{opacity:0;transform:translateY(-20px) scale(1.15) rotate(-6deg)}}
+    @keyframes ek-avatar-out{25%{transform:scale(1.1) rotate(-7deg)}100%{filter:grayscale(1);opacity:.4;transform:scale(.9);border-color:#906b74;box-shadow:none}}
+    @media(max-width:480px){#kaboom-explosion-preview .ek-scene{height:360px}#kaboom-explosion-preview .ek-deck{left:19%;width:48px;height:70px;font-size:8px}#kaboom-explosion-preview .ek-card{width:82px;height:115px}#kaboom-explosion-preview .ek-message{top:49px}#kaboom-explosion-preview .ek-burst{width:150px;height:150px;left:-75px;top:-75px}}
+    @media(prefers-reduced-motion:reduce){#kaboom-explosion-preview.ek-playing *{animation:none!important}#kaboom-explosion-preview.ek-playing .ek-card-inner{transform:rotateY(180deg)}#kaboom-explosion-preview.ek-playing .ek-avatar{filter:grayscale(1);opacity:.4}}
+  </style>
+  <div class="ek-scene">
+    <div class="ek-label">爆炸特效预览</div><div class="ek-message" aria-live="polite">抽到炸弹 · 没有 Defuse</div>
+    <div class="ek-felt"></div><div class="ek-deck">EXPLODING<br>KITTENS</div>
+    <div class="ek-card"><div class="ek-card-inner"><div class="ek-card-back"><span>✹</span>EXPLODING<br>KITTENS</div><img class="ek-card-front" src="/art/boom.jpg" alt="Exploding Kitten 炸弹卡"></div></div>
+    <div class="ek-effects" aria-hidden="true"><div class="ek-ring"></div><div class="ek-burst"></div><div class="ek-boom-word">KABOOM!</div></div>
+    <div class="ek-person"><div class="ek-avatar" role="img" aria-label="Party Bear 玩家头像"></div><span class="ek-name">Mittens</span></div>
+  </div>
+  <div class="ek-controls"><button class="ek-play" type="button">播放爆炸示例</button><span class="ek-state" role="status" aria-live="polite">约 3 秒 · 无音效</span></div>
+  <script>
+  (()=>{
+    const root=document.getElementById('kaboom-explosion-preview');
+    const button=root.querySelector('.ek-play'),effects=root.querySelector('.ek-effects'),status=root.querySelector('.ek-state'),message=root.querySelector('.ek-message'),name=root.querySelector('.ek-name');
+    const sparks=['#ffcc66','#ff8459','#ffe2ac'];
+    for(let i=0;i<22;i++){const el=document.createElement('span'),angle=i*Math.PI*2/22,reach=85+(i%4)*17;el.className='ek-particle';el.style.setProperty('--spark',sparks[i%3]);el.style.setProperty('--dx',Math.cos(angle)*reach+'px');el.style.setProperty('--dy',Math.sin(angle)*reach+'px');el.style.setProperty('--rot',(i*47)+'deg');effects.appendChild(el)}
+    for(let i=0;i<5;i++){const el=document.createElement('span');el.className='ek-smoke';el.style.setProperty('--sx',((i-2)*38)+'px');el.style.setProperty('--sy',(-45-i%3*22)+'px');effects.appendChild(el)}
+    let run=0;
+    button.addEventListener('click',()=>{
+      if(button.disabled)return;const current=++run;
+      root.classList.remove('ek-playing','ek-done');void root.offsetWidth;root.classList.add('ek-playing');button.disabled=true;message.textContent='抽到炸弹 · 没有 Defuse';name.textContent='Mittens';status.textContent='播放中…';
+      setTimeout(()=>{if(current===run)message.textContent='Mittens 被炸出局！'},1400);
+      setTimeout(()=>{if(current!==run)return;root.classList.remove('ek-playing');root.classList.add('ek-done');name.textContent='Mittens · 已出局';status.textContent='预览结束 · 尚未加入游戏';button.disabled=false;button.textContent='再看一次'},3100);
+    });
+    window.addEventListener('load',()=>setTimeout(()=>button.click(),250),{once:true});
+  })();
+  </script>
+</div>
+<p>仅供预览，尚未加入正式游戏。打开后自动播放，也可以点击“再看一次”重播。</p></main></body></html>
