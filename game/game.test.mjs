@@ -108,3 +108,28 @@ test('bottom draws and timed-out draws also produce explosion events when no Def
   action(r,'a',{action:'play',index:0});assert.equal(r.explosions.length,1);assert.equal(r.explosions[0].player,'a');assert.equal(r.phase,'playing');
   const timed=make();timed.turnSeconds=30;start(timed,0);timed.players[0].hand=[];timed.deck=['boom'];advanceBots(timed,30000);assert.equal(timed.explosions.length,1);assert.equal(timed.phase,'finished');
 });
+
+test('successful action cards publish only public type and participant events; cats have no effect',()=>{
+  for(const card of ['skip','attack','targeted','shuffle','peek','alter','bottom']){
+    const r=make(3);r.mode='party';start(r);r.players.forEach(p=>p.hand=[]);r.players[0].hand=[card];r.deck=['skip','boom','nope'];
+    action(r,'a',{action:'play',index:0,...(card==='targeted'?{target:'c'}:{})},100);
+    assert.equal(r.visualEvents.length,1,card);assert.equal(r.visualEvents[0].type,card);assert.equal(r.visualEvents[0].actor,'a');
+    const event=view(r,'b').effects[0];assert.ok(Object.keys(event).every(k=>['id','seq','type','actor','target'].includes(k)));assert.equal(event.actor,'player-0');
+    if(card==='attack'||card==='skip')assert.equal(r.visualEvents[0].target,'b');if(card==='targeted')assert.equal(r.visualEvents[0].target,'c');
+    if(card==='peek'||card==='alter'){assert.ok(!JSON.stringify(event).includes('boom'));assert.equal(view(r,'b').players[0].peek,undefined)}
+  }
+  const cats=make();start(cats);cats.players[0].hand=['tacocat','tacocat'];cats.players[1].hand=['skip'];action(cats,'a',{action:'play',indices:[0,1],target:'b'});assert.deepEqual(cats.visualEvents,[]);
+});
+test('Nope cancels the original success animation, while a counter-Nope restores it in order',()=>{
+  const canceled=make();start(canceled);canceled.players[0].hand=['attack'];canceled.players[1].hand=['nope'];action(canceled,'a',{action:'play',index:0},100);assert.deepEqual(canceled.visualEvents,[]);action(canceled,'b',{action:'nope'},200);assert.deepEqual(canceled.visualEvents.map(e=>e.type),['nope']);
+  const restored=make(3);start(restored);restored.players[0].hand=['attack'];restored.players[1].hand=['nope'];restored.players[2].hand=['nope'];action(restored,'a',{action:'play',index:0},100);action(restored,'b',{action:'nope'},200);action(restored,'c',{action:'nope'},300);
+  assert.deepEqual(restored.visualEvents.map(e=>e.type),['nope','nope','attack']);assert.deepEqual(restored.visualEvents.map(e=>e.seq),[1,2,3]);assert.equal(new Set(restored.visualEvents.map(e=>e.id)).size,3);
+});
+test('Favor emits a giver-to-requester event only after giving, without the selected card',()=>{
+  const r=make();start(r);r.players[0].hand=['favor'];r.players[1].hand=['defuse','skip'];action(r,'a',{action:'play',index:0,target:'b'},100);assert.deepEqual(r.visualEvents,[]);action(r,'b',{action:'give',index:1},200);
+  const event=r.visualEvents[0];assert.equal(event.type,'favor');assert.equal(event.actor,'a');assert.equal(event.target,'b');assert.deepEqual(r.players[0].hand,['skip']);assert.ok(!JSON.stringify(view(r,'a').effects).includes('skip'));
+});
+test('bottom draws precede Defuse or explosion effects; event buffers are bounded and reset per round',()=>{
+  for(const defuse of [true,false]){const r=make();r.mode='party';start(r);r.players[0].hand=['bottom',...(defuse?['defuse']:[])];r.players[1].hand=[];r.deck=['boom'];action(r,'a',{action:'play',index:0});assert.deepEqual(r.visualEvents.map(e=>e.type),['bottom',defuse?'defuse':'explosion'])}
+  const r=make();start(r);r.players[1].hand=[];for(let i=0;i<90;i++){r.players[0].hand=['shuffle'];action(r,'a',{action:'play',index:0})}assert.equal(r.visualEvents.length,80);assert.equal(r.visualEvents[0].seq,11);assert.equal(r.visualSequence,90);const round=r.roundId;r.phase='finished';action(r,'a',{action:'rematch'});r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'});assert.notEqual(r.roundId,round);assert.deepEqual(r.visualEvents,[]);assert.equal(r.visualSequence,0);
+});

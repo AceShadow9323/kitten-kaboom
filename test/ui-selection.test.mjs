@@ -107,3 +107,33 @@ test('reduced motion shows a brief elimination message without explosion animati
   assert.ok(s.node('#explosionMount').innerHTML.includes('game-explosion-reduced'));assert.equal(s.timers[0].ms,700);assert.ok(s.node('#explosionStatus').textContent.includes('无法拆除'));
   s.timers[0].fn();assert.equal(s.node('#explosionMount').innerHTML,'');
 });
+
+test('live card events skip history on refresh, deduplicate polling and start fresh for a rematch',()=>{
+  const s=selection(['skip']),run=expression=>JSON.parse(vm.runInContext('JSON.stringify('+expression+')',s.context));vm.runInContext('cardEffectSnapshot=null',s.context);
+  const first={code:'ROOM01',roundId:'r1',phase:'playing',effects:[{id:'e1',seq:1,type:'nope',actor:PLAYER}]};assert.deepEqual(run('freshCardEffects('+JSON.stringify(first)+')'),[]);
+  const next={...first,effects:[...first.effects,{id:'e2',seq:2,type:'shuffle',actor:PLAYER}]};assert.equal(run('freshCardEffects('+JSON.stringify(next)+')')[0].id,'e2');assert.deepEqual(run('freshCardEffects('+JSON.stringify(next)+')'),[]);assert.deepEqual(run('freshCardEffects('+JSON.stringify(first)+')'),[]);assert.deepEqual(run('freshCardEffects('+JSON.stringify(next)+')'),[]);
+  run('freshCardEffects('+JSON.stringify({...next,phase:'lobby'})+')');assert.equal(run('freshCardEffects('+JSON.stringify({...first,roundId:'r2'})+')')[0].id,'e1');
+});
+test('card effects survive polling and sequence bottom draw before explosion without duplicate legacy playback',()=>{
+  const s=selection(['skip']);vm.runInContext("room.effects=[];last='';render();room.effects=[{id:'e1',seq:1,type:'bottom',actor:id},{id:'e2',seq:2,type:'explosion',actor:'player-1'}];room.explosions=[{id:'legacy',player:'player-1'}];room.players[1].alive=false;room.rev=1;last='';render()",s.context);
+  const frame=s.node('#cardFxMount').innerHTML;assert.ok(frame.includes('bottom-card'));assert.ok(frame.includes('DRAW FROM BOTTOM'));assert.equal(s.timers[0].ms,3300);assert.equal(s.node('#explosionMount').innerHTML,'');
+  vm.runInContext('room.rev++;render()',s.context);assert.equal(s.node('#cardFxMount').innerHTML,frame);assert.equal(s.timers.length,1);
+  s.timers[0].fn();assert.equal(s.node('#cardFxMount').innerHTML,'');assert.ok(s.node('#explosionMount').innerHTML.includes('KABOOM!'));assert.equal(s.timers.length,2);s.timers[1].fn();assert.equal(s.timers.length,2);assert.equal(s.node('#explosionMount').innerHTML,'');
+});
+test('Favor uses actual giver and requester avatar coordinates rather than fixed preview seats',()=>{
+  const s=selection(['skip']);s.node('.game-stage').getBoundingClientRect=()=>({left:100,top:100,width:1000,height:500});s.node('[data-seat="'+PLAYER+'"] .seat-avatar').getBoundingClientRect=()=>({left:580,top:510,width:40,height:40});s.node('[data-seat="player-1"] .seat-avatar').getBoundingClientRect=()=>({left:180,top:210,width:40,height:40});
+  vm.runInContext("room.effects=[];last='';render();room.effects=[{id:'e1',seq:1,type:'favor',actor:id,target:'player-1'}];room.rev=1;last='';render()",s.context);
+  const frame=s.node('#cardFxMount').innerHTML;assert.ok(frame.includes('favor-heart'));assert.ok(frame.includes('--giver-x:10%'));assert.ok(frame.includes('--giver-y:26%'));assert.ok(frame.includes('--recipient-x:50%'));assert.ok(frame.includes('--recipient-y:86%'));assert.ok(!frame.includes('/art/skip.jpg'));assert.equal(s.timers[0].ms,3000);
+});
+test('leaving the round cancels running card effects; reduced motion uses a short static effect',()=>{
+  const s=selection(['skip']);vm.runInContext("globalThis.matchMedia=()=>({matches:true});room.effects=[];last='';render();room.effects=[{id:'e1',seq:1,type:'peek',actor:id}];room.rev=1;last='';render()",s.context);assert.ok(s.node('#cardFxMount').innerHTML.includes('crystal-art'));assert.ok(s.node('#cardFxMount').innerHTML.includes('playing reduced'));assert.equal(s.timers[0].ms,1000);
+  vm.runInContext("room.phase='lobby';room.rev++;render()",s.context);assert.equal(s.node('#cardFxMount').innerHTML,'');s.timers[0].fn();assert.equal(s.node('#cardFxMount').innerHTML,'');
+});
+
+test('slow state responses cannot roll back a newer game revision or replay its animations',async()=>{
+  const s=selection(['skip']);vm.runInContext("room.rev=10;room.effects=[{id:'e2',seq:2,type:'shuffle',actor:id}];globalThis.fetch=async()=>({ok:true,json:async()=>({code:room.code,rev:9,effects:[]})})",s.context);
+  const revision=await vm.runInContext("api('state?code='+room.code).then(state=>state.rev)",s.context);assert.equal(revision,10);
+  const run=expr=>JSON.parse(vm.runInContext('JSON.stringify('+expr+')',s.context));vm.runInContext('cardEffectSnapshot=null',s.context);
+  run('freshCardEffects('+JSON.stringify({code:'R1',roundId:'old',phase:'finished',rev:10,effects:[]})+')');const next={code:'R1',roundId:'new',phase:'playing',rev:12,effects:[{id:'e1',seq:1,type:'peek',actor:PLAYER}]};assert.equal(run('freshCardEffects('+JSON.stringify(next)+')').length,1);
+  assert.deepEqual(run('freshCardEffects('+JSON.stringify({code:'R1',roundId:'old',phase:'finished',rev:11,effects:[]})+')'),[]);assert.deepEqual(run('freshCardEffects('+JSON.stringify(next)+')'),[]);
+});
