@@ -35,10 +35,17 @@ test('reduced motion shortens the preview and the mobile selector plays its chos
 test('public previews never expose looked-at, drawn or gifted card faces',async()=>{
   const p=preview();for(const type of types){await p.choose(type);assert.equal(p.node('#cardImage').src,'/art/back.jpg');const markup=p.node('#effects').innerHTML;for(const match of markup.matchAll(/<img[^>]+src="([^"]+)"/g))assert.equal(match[1],'/art/back.jpg',type+' exposed a card face')}
   for(const type of ['alter','peek','favor','defuse']){await p.choose(type);assert.ok(!p.node('#effects').innerHTML.includes('<img'),type+' should depict the action without showing any cards')}
-  await p.choose('peek');assert.ok(p.node('#effects').innerHTML.includes('class="eye-open"'));assert.ok(!p.node('#effects').innerHTML.includes('future-card'));
+  await p.choose('peek');assert.ok(p.node('#effects').innerHTML.includes('class="crystal-art"'));assert.ok(!p.node('#effects').innerHTML.includes('future-card'));
 });
 test('Favor travels from giver to requester, bottom draw lifts the deck, and Defuse has cutting and safe states',async()=>{
   const p=preview();await p.choose('favor');assert.ok(p.node('#effects').innerHTML.includes('class="favor-heart"'));assert.ok(p.node('#effectDescription').textContent.includes('送牌者 Mittens'));assert.ok(p.node('#effectDescription').textContent.includes('求牌者 YOU'));assert.ok(!p.node('#effects').innerHTML.includes('flight-card'));
   await p.choose('bottom');assert.ok(p.node('#effects').innerHTML.includes('bottom-card'));assert.ok(source.includes('.stage[data-effect=bottom].playing .deck-stack{animation:deck-lift'));assert.ok(source.includes('class="deck-stack"'));
   await p.choose('defuse');const effect=p.node('#effects').innerHTML;for(const state of ['precision-scissors','cut-lead','fuse-spark','safe-shield','safe-tick'])assert.ok(effect.includes('class="'+state+'"'));assert.ok(!effect.includes('✂'));
+});
+
+test('See the Future uses a crystal ball without an eye, and every animation has its card name below it',async()=>{
+  const p=preview({search:'?card=peek'});await p.load();const markup=p.node('#effects').innerHTML;
+  assert.ok(markup.includes('class="crystal-art"'));assert.ok(markup.includes('class="crystal-clouds"'));assert.ok(!markup.includes('eye'));assert.ok(!markup.includes('<img'));
+  assert.ok(source.indexOf('id="effectTitle"')>source.indexOf('</section>'));
+  for(const type of types){await p.choose(type);assert.ok(p.node('#effectTitle').textContent.length>0);assert.ok(p.node('#effectTitle').textContent.includes(' · '));assert.ok(p.node('#effectTitle').textContent.toLowerCase().includes(type==='targeted'?'targeted':type==='peek'?'see the future':type==='alter'?'alter the future':type==='bottom'?'draw from bottom':type))}
 });
