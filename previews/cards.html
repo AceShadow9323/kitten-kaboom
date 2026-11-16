@@ -26,6 +26,7 @@
 .effect-name{position:absolute;left:50%;top:calc(49% + var(--name-offset,100px));transform:translateX(-50%);z-index:7;width:max-content;max-width:90%;margin:0;padding:0;text-align:center;font-size:16px;font-weight:750;line-height:1.4;letter-spacing:1.3px;color:var(--effect-tone,#ffcc66);text-shadow:0 2px 5px #1a0616bb,0 0 16px color-mix(in srgb,var(--effect-tone,#ffcc66) 25%,transparent);pointer-events:none}.stage[data-effect=nope]{--effect-tone:#ff9d9e;--name-offset:73px}.stage[data-effect=attack]{--effect-tone:#ffb36e;--name-offset:87px}.stage[data-effect=targeted]{--effect-tone:#ff9982;--name-offset:87px}.stage[data-effect=alter]{--effect-tone:#d1b1f0;--name-offset:112px}.stage[data-effect=peek]{--effect-tone:#d8cdf8;--name-offset:112px}.stage[data-effect=shuffle]{--effect-tone:#dec6a5;--name-offset:77px}.stage[data-effect=skip]{--effect-tone:#ffcf73;--name-offset:75px}.stage[data-effect=favor]{--effect-tone:#c4a7bc;--name-offset:0px}.stage[data-effect=bottom]{--effect-tone:#a5d4e4;--name-offset:0px}.stage[data-effect=defuse]{--effect-tone:#b3efcb;--name-offset:105px}.stage[data-effect=defuse] .safe-banner{display:none}.caption{margin-top:14px}@media(max-width:650px){.effect-name{font-size:14px;letter-spacing:.8px}.stage[data-effect=alter],.stage[data-effect=peek]{--name-offset:98px}.stage[data-effect=defuse]{--name-offset:95px}}@media(prefers-reduced-motion:reduce){.stage .effect-name{animation:none!important;left:50%!important;top:calc(49% + var(--name-offset,100px))!important;margin-top:0!important}}
 
 .stage .effect-name{opacity:0}.stage.playing .effect-name{opacity:1;animation:effect-name-life var(--effect-duration,3s) ease both}.stage[data-effect=favor] .effect-name,.stage[data-effect=bottom] .effect-name{left:50%;top:49%;transform:translate(-50%,-50%);margin-top:0}.stage:not(.playing) .fx{visibility:hidden}@keyframes effect-name-life{0%{opacity:0}12%,84%{opacity:1}100%{opacity:0}}
+.stage[data-effect=bottom].playing .deck-stack{animation:deck-lift 3s .15s ease-in-out both}.stage[data-effect=bottom].playing .self .avatar{animation:turn-pass .8s 2.2s both}
 </style>
 </head>
 <body><main>
@@ -54,7 +55,7 @@
  {id:'shuffle',name:'Shuffle',zh:'洗牌',title:'SHUFFLE · 洗牌',description:'红色牌背左右交错，旋转后重新叠回牌堆。',duration:2800},
  {id:'skip',name:'Skip',zh:'跳过',title:'SKIP · 跳过',description:'金色箭头划过牌桌，回合亮光转移给下一位玩家。',duration:2500},
  {id:'favor',name:'Favor',zh:'索取卡牌',title:'FAVOR · 索取卡牌',description:'黑色爱心从送牌者 Mittens 飞向求牌者 YOU，不展示送出的牌。',duration:3000},
- {id:'bottom',name:'Draw from Bottom',zh:'从底部抽牌',title:'DRAW FROM BOTTOM · 从底部抽牌',description:'牌桌中央显示 DRAW FROM BOTTOM，文字随特效出现和消失。',duration:3300},
+ {id:'bottom',name:'Draw from Bottom',zh:'从底部抽牌',title:'DRAW FROM BOTTOM · 从底部抽牌',description:'牌堆抬起，从底部抽出一张牌背；名字固定居中，随动画出现和消失。',duration:3300},
  {id:'defuse',name:'Defuse',zh:'拆弹',title:'DEFUSE · 拆弹成功',description:'剪断红色引线，火花熄灭，倒计时停止，安全护盾亮起。',duration:3900}
  ];
  const $=s=>document.querySelector(s),scene=$('#scene'),image=$('#cardImage'),effects=$('#effects'),picker=$('#picker'),status=$('#status'),allButton=$('#playAll');
@@ -77,7 +78,7 @@
   if(type==='shuffle')return Array.from({length:6},(_,i)=>'<div class="shuffle-card" style="--spread:'+((i-2.5)*24)+'px;--lift:'+((i%2?1:-1)*26)+'px;--tilt:'+((i-2.5)*13)+'deg;--stack:'+(i*2)+'px">'+back+'</div>').join('');
   if(type==='skip')return '<div class="skip-chevrons"><i></i><i></i><i></i></div><div class="stamp gold">SKIP</div>';
   if(type==='favor')return '<div class="favor-thread"></div><div class="favor-heart"><svg viewBox="0 0 64 60"><path d="M32 55C26 50 4 35 4 19C4 2 25-2 32 13C39-2 60 2 60 19C60 35 38 50 32 55Z" fill="#10090f" stroke="#d5a2b0" stroke-opacity=".6" stroke-width="1.5"/><path d="M13 15Q19 7 25 15" fill="none" stroke="#805268" stroke-width="3" stroke-linecap="round"/></svg></div>';
-  if(type==='bottom')return '';
+  if(type==='bottom')return '<div class="bottom-card">'+back+'</div>';
   return defuseMarkup()+sparks('#b1efc4',2);
  }
  function stopAll(){all=false;allButton.textContent='连续预览全部'}

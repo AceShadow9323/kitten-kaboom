@@ -15,7 +15,7 @@ function preview({reduced=false,search=''}={}){
 }
 test('all ten action cards have selectable distinct effects, with no cat-card previews',async()=>{
   const p=preview();assert.deepEqual(p.buttons().map(b=>b.dataset.card),types);
-  for(const type of types){await p.choose(type);assert.equal(p.node('#scene').dataset.effect,type);assert.equal(p.node('#cardImage').src,'/art/back.jpg');assert.ok(p.node('#scene').classes.has('playing'));if(type==='bottom')assert.equal(p.node('#effects').innerHTML,'');else assert.ok(p.node('#effects').innerHTML.length>20);assert.equal(p.node('button-'+type)['aria-pressed'],'true');assert.equal(p.node('#cardSelect').value,type)}
+  for(const type of types){await p.choose(type);assert.equal(p.node('#scene').dataset.effect,type);assert.equal(p.node('#cardImage').src,'/art/back.jpg');assert.ok(p.node('#scene').classes.has('playing'));assert.ok(p.node('#effects').innerHTML.length>20);assert.equal(p.node('button-'+type)['aria-pressed'],'true');assert.equal(p.node('#cardSelect').value,type)}
   for(const cat of ['tacocat','beardcat','potatocat','rainbowcat','meloncat','feral'])assert.ok(!p.node('#picker').innerHTML.includes('data-card="'+cat+'"'));
   await p.choose('targeted');assert.ok(p.node('#effects').innerHTML.includes('TARGET LOCKED'));await p.choose('alter');assert.ok(p.node('#effects').innerHTML.includes('class="wizard-arm"'));assert.ok(!p.node('#effects').innerHTML.includes('<img'));await p.choose('defuse');assert.ok(p.node('#effects').innerHTML.includes('DEFUSED ✓'));assert.ok(p.node('#effects').innerHTML.includes('class="precision-scissors"'));
 });
@@ -37,9 +37,9 @@ test('public previews never expose looked-at, drawn or gifted card faces',async(
   for(const type of ['alter','peek','favor','defuse']){await p.choose(type);assert.ok(!p.node('#effects').innerHTML.includes('<img'),type+' should depict the action without showing any cards')}
   await p.choose('peek');assert.ok(p.node('#effects').innerHTML.includes('class="crystal-art"'));assert.ok(!p.node('#effects').innerHTML.includes('future-card'));
 });
-test('Favor travels from giver to requester, bottom draw is text-only, and Defuse has cutting and safe states',async()=>{
+test('Favor travels from giver to requester, bottom draw keeps its animation with a centered label, and Defuse has cutting and safe states',async()=>{
   const p=preview();await p.choose('favor');assert.ok(p.node('#effects').innerHTML.includes('class="favor-heart"'));assert.ok(p.node('#effectDescription').textContent.includes('送牌者 Mittens'));assert.ok(p.node('#effectDescription').textContent.includes('求牌者 YOU'));assert.ok(!p.node('#effects').innerHTML.includes('flight-card'));
-  await p.choose('bottom');assert.equal(p.node('#effects').innerHTML,'');assert.ok(!source.includes('.stage[data-effect=bottom].playing .deck-stack{animation:deck-lift'));assert.equal(p.node('#effectTitle').textContent,'DRAW FROM BOTTOM');
+  await p.choose('bottom');assert.ok(p.node('#effects').innerHTML.includes('bottom-card'));assert.ok(p.node('#effects').innerHTML.includes('/art/back.jpg'));assert.ok(source.includes('.stage[data-effect=bottom].playing .deck-stack{animation:deck-lift'));assert.ok(!source.includes('.stage[data-effect=bottom].playing .effect-name{'));assert.equal(p.node('#effectTitle').textContent,'DRAW FROM BOTTOM');
   await p.choose('defuse');const effect=p.node('#effects').innerHTML;for(const state of ['precision-scissors','cut-lead','fuse-spark','safe-shield','safe-tick'])assert.ok(effect.includes('class="'+state+'"'));assert.ok(!effect.includes('✂'));
 });
 

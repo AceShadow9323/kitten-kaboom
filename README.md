@@ -106,7 +106,7 @@ npm run check
 
 功能牌特效预览：`/preview/cards`，包含 NOPE、Attack、Targeted Attack、Alter/See the Future、Shuffle、Skip、Favor、Draw from Bottom、Defuse，支持单卡重播和连续预览。这批功能牌特效仅在预览页播放，尚未接入正式对局。可用 `?card=defuse` 等参数直接选择卡牌。
 
-公共功能牌预览不展示私密牌面：Alter 为巫师挥杖，See the Future 为水晶球发光与星光浮现，Favor 用黑色爱心从送牌者飞向求牌者；底抽仅显示居中文字，Defuse 用剪线、停表和绿色护盾。
+公共功能牌预览不展示私密牌面：Alter 为巫师挥杖，See the Future 为水晶球发光与星光浮现，Favor 用黑色爱心从送牌者飞向求牌者；底抽保留抬牌堆与底部抽牌动画，文字固定居中，Defuse 用剪线、停表和绿色护盾。
 
 卡牌特效预览中，每种动画图案正下方直接显示该功能牌的英文名称，文字使用接近该特效的颜色，牌桌外不显示独立名称标题或说明段落。
 
