@@ -152,3 +152,22 @@ test('public action effects synchronize through HTTP without sharing future card
   const played=(await call('/api/move',a,{code,action:'play',index:0})).data,other=(await call('/api/state?code='+code,b)).data;assert.equal(played.effects[0].id,other.effects[0].id);assert.equal(other.effects[0].type,'peek');assert.equal(other.effects[0].actor,'player-0');assert.ok(!JSON.stringify(other.effects).includes('boom'));assert.equal(other.players[0].peek,undefined);assert.ok(!JSON.stringify(other).includes(a));
   await call('/api/move',a,{code,action:'play',index:0,target:'player-1'});const given=(await call('/api/move',b,{code,action:'give',index:1})).data,last=given.effects.at(-1);assert.equal(last.type,'favor');assert.equal(last.target,b);assert.equal(last.actor,'player-0');assert.ok(!JSON.stringify(last).includes('attack'));assert.ok(!JSON.stringify(last).includes(a));
 });
+
+test('a stale draw click cannot consume the next attacked draw after a timeout auto-draw',async t=>{
+  const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'Host'})).data;await call('/api/join',b,{code,name:'Guest'});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+  await store.withRoom(code,r=>{r.turn=0;r.owed=2;r.attacked=true;r.players.forEach(p=>p.hand=[]);r.deck=['skip','shuffle','peek'];delete r.turnClock;return {changed:true,reply:null}});
+  const before=(await call('/api/state?code='+code,a)).data;assert.equal(typeof before.drawKey,'string');
+  await store.withRoom(code,r=>{r.turnClock.deadline=Date.now()-1;return {changed:true,reply:null}});
+  const automatic=(await call('/api/state?code='+code,b)).data;assert.equal(automatic.remaining,2);assert.equal(automatic.owed,1);assert.notEqual(automatic.drawKey,before.drawKey);
+  const stale=(await call('/api/move',a,{code,action:'draw',drawKey:before.drawKey})).data;assert.equal(stale.remaining,2);assert.equal(stale.players[0].hand.length,1);assert.equal(stale.turn,0);assert.equal(stale.owed,1);assert.equal(stale.rev,automatic.rev);
+  const next=(await call('/api/move',a,{code,action:'draw',drawKey:stale.drawKey})).data;assert.equal(next.remaining,1);assert.equal(next.players[0].hand.length,2);assert.equal(next.turn,1);
+});
+test('repeated identical draw requests are processed once under Attack, including a defused kitten',async t=>{
+  const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'Host'})).data;await call('/api/join',b,{code,name:'Guest'});await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+  for(const bomb of [false,true]){
+    await store.withRoom(code,r=>{r.turn=0;r.owed=2;r.attacked=true;r.players[0].hand=bomb?['defuse']:[];r.deck=bomb?['boom','skip','shuffle']:['skip','shuffle','peek'];return {changed:true,reply:null}});
+    const before=(await call('/api/state?code='+code,a)).data,request={code,action:'draw',drawKey:before.drawKey};const responses=await Promise.all([call('/api/move',a,request),call('/api/move',a,request)]);assert.ok(responses.every(r=>r.status===200));
+    const state=(await call('/api/state?code='+code,a)).data;assert.equal(state.remaining,2);assert.equal(state.players[0].hand.length,bomb?0:1);assert.equal(state.owed,bomb?2:1);assert.equal(state.pending,bomb);assert.equal(state.turn,0);
+    if(bomb){const hidden=(await call('/api/move',a,{code,action:'reinsert',position:2})).data;assert.equal(hidden.owed,1);const repeat=(await call('/api/move',a,request)).data;assert.equal(repeat.remaining,hidden.remaining);assert.equal(repeat.pending,false)}
+  }
+});

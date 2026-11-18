@@ -3,7 +3,7 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {html} from '../game/ui.mjs';
-import {action, view, advanceBots, maxPlayers} from '../game/game.mjs';
+import {action, view, advanceBots, maxPlayers, drawKey} from '../game/game.mjs';
 import {HttpError} from './storage.mjs';
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Z2-9]{6}$/;
@@ -101,7 +101,9 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         } else {
           const move = {...body};
           if (['play','removebot'].includes(move.action) && /^player-\d+$/.test(move.target || '')) move.target = room.players[Number(move.target.split('-')[1])]?.id;
-          try { action(room, token, move); } catch (error) { throw new HttpError(400, error.message); }
+          // A click from an already completed draw step must not consume the next owed draw.
+          if (move.action === 'draw' && move.drawKey !== undefined && move.drawKey !== drawKey(room)) changed = false;
+          else { try { action(room, token, move); } catch (error) { throw new HttpError(400, error.message); } }
         }
         if (changed) room.rev = (room.rev ?? 0) + 1;
         return {changed, reply: view(room,token)};

@@ -146,3 +146,10 @@ test('See the Future displays ordered card faces directly for its user, includin
 test('See the Future card faces are not rendered from another player private result',()=>{
   const s=selection(['skip']);vm.runInContext("room.players[1].peek=['boom','defuse','nope'];last='';render()",s.context);assert.equal(s.node('#peekCards').innerHTML,'');assert.ok(!s.node('#cardFxMount').innerHTML.includes('/art/boom.jpg'));
 });
+
+test('manual draw sends the snapshot draw key so a stale click cannot draw twice',async()=>{
+  const s=selection(['skip']);let request;
+  s.context.capture=body=>{request=JSON.parse(body)};
+  vm.runInContext("room.drawKey='round:0:0:0:2';room.rev=10;globalThis.fetch=async(url,options)=>{capture(options.body);return {ok:true,json:async()=>room}}",s.context);
+  await vm.runInContext("move('draw')",s.context);assert.equal(request.action,'draw');assert.equal(request.drawKey,'round:0:0:0:2');
+});
