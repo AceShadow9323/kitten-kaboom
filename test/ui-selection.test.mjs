@@ -137,3 +137,12 @@ test('slow state responses cannot roll back a newer game revision or replay its 
   run('freshCardEffects('+JSON.stringify({code:'R1',roundId:'old',phase:'finished',rev:10,effects:[]})+')');const next={code:'R1',roundId:'new',phase:'playing',rev:12,effects:[{id:'e1',seq:1,type:'peek',actor:PLAYER}]};assert.equal(run('freshCardEffects('+JSON.stringify(next)+')').length,1);
   assert.deepEqual(run('freshCardEffects('+JSON.stringify({code:'R1',roundId:'old',phase:'finished',rev:11,effects:[]})+')'),[]);assert.deepEqual(run('freshCardEffects('+JSON.stringify(next)+')'),[]);
 });
+
+test('See the Future displays ordered card faces directly for its user, including short decks',()=>{
+  const s=selection(['skip']);vm.runInContext("room.players[0].peek=['boom','defuse','nope'];last='';render()",s.context);let panel=s.node('#peekCards').innerHTML;
+  assert.ok(panel.includes('SEE THE FUTURE · 仅你可见'));assert.equal((panel.match(/<img /g)||[]).length,3);assert.ok(panel.indexOf('/art/boom.jpg')<panel.indexOf('/art/defuse.jpg'));assert.ok(panel.indexOf('/art/defuse.jpg')<panel.indexOf('/art/nope.jpg'));assert.ok(panel.includes('1 · TOP · 下一张'));assert.ok(panel.includes('data-inspect="boom"'));assert.ok(panel.includes('继续出牌，或抽牌结束'));
+  vm.runInContext("room.players[0].peek=['shuffle','skip'];last='';render()",s.context);panel=s.node('#peekCards').innerHTML;assert.equal((panel.match(/<img /g)||[]).length,2);assert.ok(!panel.includes('/art/nope.jpg'));
+});
+test('See the Future card faces are not rendered from another player private result',()=>{
+  const s=selection(['skip']);vm.runInContext("room.players[1].peek=['boom','defuse','nope'];last='';render()",s.context);assert.equal(s.node('#peekCards').innerHTML,'');assert.ok(!s.node('#cardFxMount').innerHTML.includes('/art/boom.jpg'));
+});

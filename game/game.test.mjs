@@ -133,3 +133,19 @@ test('bottom draws precede Defuse or explosion effects; event buffers are bounde
   for(const defuse of [true,false]){const r=make();r.mode='party';start(r);r.players[0].hand=['bottom',...(defuse?['defuse']:[])];r.players[1].hand=[];r.deck=['boom'];action(r,'a',{action:'play',index:0});assert.deepEqual(r.visualEvents.map(e=>e.type),['bottom',defuse?'defuse':'explosion'])}
   const r=make();start(r);r.players[1].hand=[];for(let i=0;i<90;i++){r.players[0].hand=['shuffle'];action(r,'a',{action:'play',index:0})}assert.equal(r.visualEvents.length,80);assert.equal(r.visualEvents[0].seq,11);assert.equal(r.visualSequence,90);const round=r.roundId;r.phase='finished';action(r,'a',{action:'rematch'});r.players.forEach(p=>p.ready=true);action(r,'a',{action:'start'});assert.notEqual(r.roundId,round);assert.deepEqual(r.visualEvents,[]);assert.equal(r.visualSequence,0);
 });
+
+test('rules audit: Favor and cat pairs do not end a turn or reduce owed draws',()=>{
+  for(const mode of ['original','party'])for(const owed of [1,2]){
+    const r=make(3);r.mode=mode;start(r);r.players.forEach(p=>p.hand=[]);r.players[0].hand=['favor','tacocat','tacocat','skip'];r.players[1].hand=['attack','shuffle'];r.deck=['skip','shuffle'];r.owed=owed;r.attacked=owed===2;
+    action(r,'a',{action:'play',index:0,target:'b'});action(r,'b',{action:'give',index:1});assert.equal(r.turn,0);assert.equal(r.owed,owed);
+    action(r,'a',{action:'play',indices:[0,1],target:'b'});assert.equal(r.turn,0);assert.equal(r.owed,owed);
+    action(r,'a',{action:'draw'});assert.equal(r.turn,owed===1?1:0);assert.equal(r.owed,1);
+    if(owed===2){action(r,'a',{action:'play',index:0});assert.equal(r.turn,1)}
+  }
+});
+test('rules audit: a defused kitten returns to the deck, but a fatal kitten does not',()=>{
+  const r=make(3);start(r);r.players.forEach(p=>p.hand=[]);r.players[0].hand=['defuse'];r.deck=['boom','skip','boom','attack'];
+  action(r,'a',{action:'draw'});assert.equal(r.pending,'a');assert.equal(r.players[0].alive,true);assert.equal(r.deck.filter(c=>c==='boom').length,1);assert.deepEqual(r.discard,['defuse']);
+  action(r,'a',{action:'reinsert',position:3});assert.equal(r.deck.filter(c=>c==='boom').length,2);assert.equal(r.deck.at(-1),'boom');
+  action(r,'b',{action:'draw'});action(r,'c',{action:'draw'});assert.equal(r.players[2].alive,false);assert.equal(r.pending,undefined);assert.equal(r.deck.filter(c=>c==='boom').length,1);assert.equal(r.discard.at(-1),'boom');assert.equal(r.turn,0);
+});
