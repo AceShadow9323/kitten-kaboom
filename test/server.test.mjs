@@ -171,3 +171,25 @@ test('repeated identical draw requests are processed once under Attack, includin
     if(bomb){const hidden=(await call('/api/move',a,{code,action:'reinsert',position:2})).data;assert.equal(hidden.owed,1);const repeat=(await call('/api/move',a,request)).data;assert.equal(repeat.remaining,hidden.remaining);assert.equal(repeat.pending,false)}
   }
 });
+
+test('four human Party Pack players rotate fully and majority voting permits abstention',async t=>{
+ const {call,store}=await setup(t),ids=Array.from({length:4},()=>randomUUID());
+ const {code}=(await call('/api/create',ids[0],{name:'A',mode:'party'})).data;
+ for(let i=1;i<4;i++)await call('/api/join',ids[i],{code,name:String(i)});
+ await call('/api/move',ids[0],{code,action:'settings',turnSeconds:0});
+ for(const who of ids)await call('/api/move',who,{code,action:'ready'});
+ await call('/api/move',ids[0],{code,action:'start'});
+ await store.withRoom(code,r=>{r.deck=Array(20).fill('skip');r.players.forEach(p=>p.hand=[]);return {changed:true,reply:null}});
+ for(let n=0;n<12;n++){
+   const before=(await call('/api/state?code='+code,ids[n%4])).data;
+   assert.equal(before.turn,n%4);
+   assert.equal((await call('/api/move',ids[n%4],{code,action:'draw',drawKey:before.drawKey})).status,200);
+   for(const who of ids)assert.equal((await call('/api/state?code='+code,who)).data.turn,(n+1)%4);
+ }
+ const vote=(await call('/api/move',ids[0],{code,action:'requestend'})).data.endVote;
+ const no=(await call('/api/move',ids[1],{code,action:'voteend',voteId:vote.id,agree:false})).data;
+ assert.equal(no.phase,'playing');assert.ok(no.endVote);
+ await call('/api/move',ids[2],{code,action:'voteend',voteId:vote.id,agree:null});
+ const ended=(await call('/api/move',ids[3],{code,action:'voteend',voteId:vote.id,agree:true})).data;
+ assert.equal(ended.phase,'lobby');assert.equal(ended.winner,undefined);
+});
