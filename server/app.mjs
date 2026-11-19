@@ -84,6 +84,11 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
       const data = await store.withRoom(code, room => {
         const member = room.players.some(p=>p.id === token);
         if (!member && path !== '/api/join') throw new HttpError(403, 'Join this room first.');
+        const requestId = path === '/api/move' ? body.requestId : undefined;
+        if (requestId !== undefined && !TOKEN.test(requestId)) throw new HttpError(400, 'Invalid action identity.');
+        if (requestId && room.appliedMoves?.some(m=>m.token===token&&m.id===requestId)) return {changed:false,reply:view(room,token)};
+        if (path === '/api/move' && body.roundId !== undefined && body.roundId !== room.roundId) throw new HttpError(409, 'The round changed. Refresh the table before playing.');
+        if (path === '/api/move' && ['play','give'].includes(body.action) && body.handKey !== undefined && body.handKey !== JSON.stringify(room.players.find(p=>p.id===token)?.hand)) throw new HttpError(409, 'Your hand changed. Select your card again.');
         let changed = true;
         if (path === '/api/state') changed = advanceBots(room);
         else if (path === '/api/join') {
@@ -104,6 +109,11 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
           // A click from an already completed draw step must not consume the next owed draw.
           if (move.action === 'draw' && move.drawKey !== undefined && move.drawKey !== drawKey(room)) changed = false;
           else { try { action(room, token, move); } catch (error) { throw new HttpError(400, error.message); } }
+        }
+        if (requestId) {
+          (room.appliedMoves??=[]).push({token,id:requestId});
+          room.appliedMoves=room.appliedMoves.slice(-128);
+          changed=true;
         }
         if (changed) room.rev = (room.rev ?? 0) + 1;
         return {changed, reply: view(room,token)};

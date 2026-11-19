@@ -193,3 +193,25 @@ test('four human Party Pack players rotate fully and majority voting permits abs
  const ended=(await call('/api/move',ids[3],{code,action:'voteend',voteId:vote.id,agree:true})).data;
  assert.equal(ended.phase,'lobby');assert.equal(ended.winner,undefined);
 });
+
+test('duplicate play, ready and Nope requests execute once and never expose receipts',async t=>{
+ const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();
+ const {code}=(await call('/api/create',a,{name:'A'})).data;await call('/api/join',b,{code,name:'B'});
+ const ready={code,action:'ready',requestId:randomUUID()};
+ const duplicates=await Promise.all([call('/api/move',a,ready),call('/api/move',a,ready)]);assert.ok(duplicates.every(x=>x.status===200));assert.equal(duplicates[1].data.players[0].ready,true);
+ await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+ await store.withRoom(code,r=>{r.players[0].hand=['peek','shuffle'];r.players[1].hand=[];r.deck=['skip','boom','defuse'];return {changed:true,reply:null}});
+ const play={code,action:'play',index:0,requestId:randomUUID()};
+ const results=await Promise.all([call('/api/move',a,play),call('/api/move',a,play)]);assert.ok(results.every(x=>x.status===200));assert.deepEqual(results[1].data.players[0].hand,['shuffle']);assert.equal(results[1].data.effects.length,1);assert.equal(results[1].data.appliedMoves,undefined);assert.ok(!JSON.stringify(results[1].data).includes(play.requestId));
+ await store.withRoom(code,r=>{r.players[0].hand=['attack'];r.players[1].hand=['nope','nope'];return {changed:true,reply:null}});
+ await call('/api/move',a,{code,action:'play',index:0});
+ const nope={code,action:'nope',requestId:randomUUID()};await call('/api/move',b,nope);const repeated=(await call('/api/move',b,nope)).data;
+ assert.deepEqual(repeated.players[1].hand,['nope']);assert.equal(repeated.stack.nopes,1);
+});
+test('stale hand indices and previous-round actions are rejected without changing cards',async t=>{
+ const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'A'})).data;await call('/api/join',b,{code,name:'B'});await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});const started=(await call('/api/move',a,{code,action:'start'})).data;
+ await store.withRoom(code,r=>{r.players[0].hand=['shuffle','skip'];r.players[1].hand=[];return {changed:true,reply:null}});
+ const stale=await call('/api/move',a,{code,action:'play',index:0,roundId:started.roundId,handKey:JSON.stringify(['peek','skip']),requestId:randomUUID()});assert.equal(stale.status,409);
+ const old=await call('/api/move',a,{code,action:'draw',roundId:'previous-round',requestId:randomUUID()});assert.equal(old.status,409);
+ const state=(await call('/api/state?code='+code,a)).data;assert.deepEqual(state.players[0].hand,['shuffle','skip']);assert.equal(state.discardCount,0);
+});

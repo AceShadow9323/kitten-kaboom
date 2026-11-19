@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {randomUUID} from 'node:crypto';
 import {html} from '../game/ui.mjs';
 const PLAYER='11111111-1111-4111-8111-111111111111';
 function selection(hand,mode='party',navigation={}) {
@@ -8,7 +9,7 @@ function selection(hand,mode='party',navigation={}) {
   const make=s=>{if(!nodes.has(s))nodes.set(s,{innerHTML:'',textContent:'',value:'',style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(k,v){this[k]=v},insertAdjacentHTML(_,v){this.innerHTML+=v}});return nodes.get(s)};
   const cards=hand.map((_,i)=>({dataset:{index:String(i)},setAttribute(k,v){this[k]=v},closest(){return {classList:{toggle(){}}}}}));
   const modes=()=>[...make('#selection').innerHTML.matchAll(/data-combo-count="(\d)"/g)].map(m=>{const b=make('mode-'+m[1]);b.dataset={comboCount:m[1]};return b});
-  const context=vm.createContext({document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},setTimeout(fn,ms){timers.push({fn,ms})},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
+  const context=vm.createContext({crypto:{randomUUID},document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},setTimeout(fn,ms){timers.push({fn,ms})},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
   const room={code:'ABC234',host:PLAYER,mode,phase:'playing',turn:0,owed:1,remaining:30,discard:[],log:[],players:[{id:PLAYER,name:'Me',alive:true,count:hand.length,hand},{id:'player-1',name:'Friend',alive:true,count:5}]};
   vm.runInContext('room='+JSON.stringify(room)+';render()',context);
@@ -152,4 +153,46 @@ test('manual draw sends the snapshot draw key so a stale click cannot draw twice
   s.context.capture=body=>{request=JSON.parse(body)};
   vm.runInContext("room.drawKey='round:0:0:0:2';room.rev=10;globalThis.fetch=async(url,options)=>{capture(options.body);return {ok:true,json:async()=>room}}",s.context);
   await vm.runInContext("move('draw')",s.context);assert.equal(request.action,'draw');assert.equal(request.drawKey,'round:0:0:0:2');
+});
+
+
+test('ordinary state polling keeps selected cats and chosen target',async()=>{
+ const s=selection(['tacocat','tacocat']);vm.runInContext('room.rev=5;render()',s.context);s.cards[0].onclick();s.node('#target').value='player-1';
+ vm.runInContext("code=room.code;room.rev=5;globalThis.fetch=async()=>({ok:true,json:async()=>({...room,serverNow:Date.now()})})",s.context);
+ await vm.runInContext('pollRoom()',s.context);
+ assert.deepEqual(s.selected(),[0,1]);assert.equal(s.node('#target').value,'player-1');
+});
+test('late polls are ignored after leaving or switching rooms and overlapping polls are skipped',async()=>{
+ const s=selection(['skip']);let resolve,requests=0;
+ s.context.delayedFetch=()=>{requests++;return new Promise(r=>{resolve=r})};
+ vm.runInContext('code=room.code;globalThis.fetch=delayedFetch',s.context);
+ const pending=vm.runInContext('pollRoom()',s.context);await vm.runInContext('pollRoom()',s.context);assert.equal(requests,1);
+ vm.runInContext("room=null;code='NEW234'",s.context);
+ resolve({ok:true,json:async()=>({code:'ABC234',rev:20})});await pending;
+ assert.equal(vm.runInContext('room',s.context),null);assert.equal(vm.runInContext('code',s.context),'NEW234');
+});
+test('refresh dealing leaves cards beyond the initial eight visible',()=>{
+ const s=selection(Array(11).fill('skip')),cards=Array.from({length:11},()=>({style:{},isConnected:true,getBoundingClientRect:()=>({left:0,top:0,width:60,height:84}),animate:()=>({finished:Promise.resolve()})}));
+ s.node('#deckDraw').getBoundingClientRect=()=>({left:0,top:0,width:60,height:84});s.node('#deckDraw').animate=()=>({});
+ s.context.document.querySelectorAll=selector=>selector==='.table-hand .card'?cards:[];
+ s.context.matchMedia=()=>({matches:false});
+ vm.runInContext('animateTableCards({firstDeal:true,newCards:false,played:false,seated:[],oldCount:0})',s.context);
+ assert.ok(cards.slice(8).every(c=>c.style.opacity!=='0'));
+});
+
+test('a stalled request aborts and releases the action busy flag',async()=>{
+ const s=selection(['skip']);s.context.AbortController=AbortController;s.context.clearTimeout=()=>{};
+ s.context.fetch=(_,options)=>new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(Error('Timed out')),{once:true}));
+ const pending=vm.runInContext("move('draw')",s.context);const timeout=s.timers.find(t=>t.ms===12000);assert.ok(timeout);timeout.fn();await pending;
+ assert.equal(vm.runInContext('busy',s.context),false);assert.ok(s.node('#error').textContent);
+});
+test('temporary reconnect failures retain room identity and retry; missing rooms return to setup',async()=>{
+ const s=selection(['skip']);
+ vm.runInContext("code=room.code;room=null;globalThis.fetch=async()=>{throw Error('offline')}",s.context);
+ await vm.runInContext('pollRoom()',s.context);assert.equal(vm.runInContext('code',s.context),'ABC234');
+ vm.runInContext("globalThis.fetch=async()=>({ok:true,json:async()=>({code:'ABC234',host:id,phase:'lobby',players:[{id,name:'Me',ready:false}],log:[]})})",s.context);
+ await vm.runInContext('pollRoom()',s.context);assert.equal(vm.runInContext('room.phase',s.context),'lobby');
+ s.context.sessionStorage.removeItem=()=>{};
+ vm.runInContext("globalThis.fetch=async()=>({ok:false,status:404,json:async()=>({error:'Room not found'})})",s.context);
+ await vm.runInContext('pollRoom()',s.context);assert.equal(vm.runInContext('room',s.context),null);assert.equal(vm.runInContext('code',s.context),null);
 });
