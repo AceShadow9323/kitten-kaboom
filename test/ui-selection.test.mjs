@@ -196,3 +196,11 @@ test('temporary reconnect failures retain room identity and retry; missing rooms
  vm.runInContext("globalThis.fetch=async()=>({ok:false,status:404,json:async()=>({error:'Room not found'})})",s.context);
  await vm.runInContext('pollRoom()',s.context);assert.equal(vm.runInContext('room',s.context),null);assert.equal(vm.runInContext('code',s.context),null);
 });
+
+test('browser audit backup deduplicates polls, excludes private state and survives losing the room',()=>{
+ const s=selection(['skip']),storage=new Map();s.context.localStorage.getItem=k=>storage.get(k)??null;s.context.localStorage.setItem=(k,v)=>storage.set(k,v);
+ const event={id:'event1',revision:1,at:new Date().toISOString(),messages:[{text:'A played attack.'}],after:{owed:2}};
+ s.context.auditInput={code:'ABC234',auditRecent:[event],players:[{hand:['PRIVATE_CARD']}],alter:{cards:['SECRET_FUTURE']}};
+ vm.runInContext("saveGameLog(auditInput);saveGameLog(auditInput);room=null;code=null;location.pathname='/play';landing()",s.context);
+ const saved=JSON.parse(storage.get('kk-public-game-logs-v1'));assert.equal(saved.ABC234.events.length,1);assert.ok(!JSON.stringify(saved).includes('PRIVATE_CARD'));assert.ok(!JSON.stringify(saved).includes('SECRET_FUTURE'));assert.ok(s.node('#app').innerHTML.includes('导出上次牌局日志'));
+});

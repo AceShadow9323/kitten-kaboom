@@ -1,3 +1,4 @@
+import {auditState,appendAudit} from './audit.mjs';
 import {avatarId} from '../game/avatars.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
@@ -19,7 +20,7 @@ async function readBody(req) {
   try { const data = JSON.parse(Buffer.concat(chunks).toString('utf8')); if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error(); return data; }
   catch { throw new HttpError(400, 'Invalid JSON request.'); }
 }
-export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
+export function createApp({store, trustProxy = false, rateLimit = true, auditSink = ()=>{}} = {}) {
   if (!store) throw new Error('Room storage is required.');
   const assets = new Map();
   const counters = new Map();
@@ -55,9 +56,9 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
         reply(res, 200, req.method === 'HEAD' ? '' : bytes, {'content-type': artwork[2]==='png'?'image/png':'image/jpeg', 'cache-control': 'public, max-age=86400'}); return;
       }
       const path = url.pathname;
-      if (!['/api/create', '/api/join', '/api/move', '/api/state'].includes(path)) throw new HttpError(404, 'Not found.');
+      if (!['/api/create', '/api/join', '/api/move', '/api/state', '/api/logs'].includes(path)) throw new HttpError(404, 'Not found.');
       checkRate(req, path);
-      if (req.method !== (path === '/api/state' ? 'GET' : 'POST')) throw new HttpError(405, 'Method not allowed.');
+      if (req.method !== (['/api/state','/api/logs'].includes(path) ? 'GET' : 'POST')) throw new HttpError(405, 'Method not allowed.');
       // Cross-origin browser game actions are unnecessary. Normal same-origin fetches work without a CORS grant.
       if (req.headers.origin) {
         let originHost; try { originHost = new URL(req.headers.origin).host; } catch { throw new HttpError(403, 'Invalid request origin.'); }
@@ -81,9 +82,12 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
       }
       const code = String(body.code ?? url.searchParams.get('code') ?? '').toUpperCase();
       if (!CODE.test(code)) throw new HttpError(400, 'Enter a six-character room code.');
+      let committedAudit;
       const data = await store.withRoom(code, room => {
         const member = room.players.some(p=>p.id === token);
         if (!member && path !== '/api/join') throw new HttpError(403, 'Join this room first.');
+        if(path==='/api/logs')return {changed:false,reply:{version:1,code:room.code,events:room.auditLog??[]}};
+        const before=auditState(room),sequence=room.logSequence??0,actor=room.players.find(p=>p.id===token)?.name;
         const requestId = path === '/api/move' ? body.requestId : undefined;
         if (requestId !== undefined && !TOKEN.test(requestId)) throw new HttpError(400, 'Invalid action identity.');
         if (requestId && room.appliedMoves?.some(m=>m.token===token&&m.id===requestId)) return {changed:false,reply:view(room,token)};
@@ -115,9 +119,13 @@ export function createApp({store, trustProxy = false, rateLimit = true} = {}) {
           room.appliedMoves=room.appliedMoves.slice(-128);
           changed=true;
         }
-        if (changed) room.rev = (room.rev ?? 0) + 1;
+        if (changed) {
+          room.rev = (room.rev ?? 0) + 1;
+          committedAudit=appendAudit(room,{before,sequence,actor,source:path==='/api/state'?'automatic':path==='/api/join'?'join':body.action});
+        }
         return {changed, reply: view(room,token)};
       });
+      if(committedAudit){try{auditSink(committedAudit)}catch{console.error('Game audit sink failed. Room audit remains available.')}}
       reply(res,200,data);
     } catch (error) {
       const status = error instanceof HttpError ? error.status : req.url === '/healthz' ? 503 : 500;

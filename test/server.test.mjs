@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createApp} from '../server/app.mjs';
 import {MemoryStore} from '../server/storage.mjs';
-async function setup(t) {
+async function setup(t,options={}) {
   const store = new MemoryStore();
-  const app = createApp({store,rateLimit:false});
+  const app = createApp({store,rateLimit:false,...options});
   await new Promise(resolve=>app.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>{app.closeAllConnections();app.close(resolve)}));
   const base = 'http://127.0.0.1:'+app.address().port;
@@ -214,4 +214,30 @@ test('stale hand indices and previous-round actions are rejected without changin
  const stale=await call('/api/move',a,{code,action:'play',index:0,roundId:started.roundId,handKey:JSON.stringify(['peek','skip']),requestId:randomUUID()});assert.equal(stale.status,409);
  const old=await call('/api/move',a,{code,action:'draw',roundId:'previous-round',requestId:randomUUID()});assert.equal(old.status,409);
  const state=(await call('/api/state?code='+code,a)).data;assert.deepEqual(state.players[0].hand,['shuffle','skip']);assert.equal(state.discardCount,0);
+});
+
+test('automatic audit saves committed Attack, Skip and fatal draw with public before/after state',async t=>{
+ const written=[],{call,store}=await setup(t,{auditSink:e=>written.push(e)}),a=randomUUID(),b=randomUUID();
+ const {code}=(await call('/api/create',a,{name:'A',mode:'party'})).data;await call('/api/join',b,{code,name:'B'});
+ await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+ await store.withRoom(code,r=>{r.players[0].hand=['attack'];r.players[1].hand=['skip'];r.deck=['boom'];return {changed:true,reply:null}});
+ const attack={code,action:'play',index:0,requestId:randomUUID()};await call('/api/move',a,attack);const count=written.length;await call('/api/move',a,attack);assert.equal(written.length,count);
+ await call('/api/move',b,{code,action:'play',index:0});await call('/api/move',b,{code,action:'draw'});
+ const exported=(await call('/api/logs?code='+code,a)).data,events=exported.events.slice(-3);
+ assert.equal(events[0].after.owed,2);assert.equal(events[0].after.turnName,'B');
+ assert.equal(events[1].before.owed,2);assert.equal(events[1].after.owed,1);assert.equal(events[1].after.turnName,'B');
+ assert.equal(events[2].after.phase,'finished');assert.equal(events[2].after.players[1].alive,false);
+ assert.ok(events[2].messages.some(m=>m.text.includes('KABOOM')));assert.ok(events.every(e=>Number.isFinite(Date.parse(e.at))));
+ assert.equal((await call('/api/logs?code='+code,randomUUID())).status,403);
+ const before=written.length;await call('/api/move',a,{code,action:'play',index:999});assert.equal(written.length,before);
+ assert.equal((await call('/api/logs?code='+code,a)).data.events.length,exported.events.length);
+});
+
+test('audit does not expose private cards, deck order, player tokens or reinsert positions',async t=>{
+ const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'A'})).data;
+ await call('/api/join',b,{code,name:'B'});await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+ await store.withRoom(code,r=>{r.players[0].hand=['peek','rainbowcat'];r.players[1].hand=['defuse'];r.deck=['boom','meloncat','beardcat'];return {changed:true,reply:null}});
+ await call('/api/move',a,{code,action:'play',index:0});const data=(await call('/api/logs?code='+code,b)).data;
+ const serialized=JSON.stringify(data);for(const secret of [a,b,'rainbowcat','meloncat','beardcat','handKey','position','authorization'])assert.ok(!serialized.includes(secret),secret);
+ const before=data.events.length;await call('/api/state?code='+code,b);assert.equal((await call('/api/logs?code='+code,b)).data.events.length,before);
 });
