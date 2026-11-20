@@ -9,7 +9,7 @@ function selection(hand,mode='party',navigation={}) {
   const make=s=>{if(!nodes.has(s))nodes.set(s,{innerHTML:'',textContent:'',value:'',style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(k,v){this[k]=v},insertAdjacentHTML(_,v){this.innerHTML+=v}});return nodes.get(s)};
   const cards=hand.map((_,i)=>({dataset:{index:String(i)},setAttribute(k,v){this[k]=v},closest(){return {classList:{toggle(){}}}}}));
   const modes=()=>[...make('#selection').innerHTML.matchAll(/data-combo-count="(\d)"/g)].map(m=>{const b=make('mode-'+m[1]);b.dataset={comboCount:m[1]};return b});
-  const context=vm.createContext({crypto:{randomUUID},document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},setTimeout(fn,ms){timers.push({fn,ms})},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
+  const context=vm.createContext({crypto:{randomUUID},document:{body:{classList:{add(){},remove(){}}},querySelector:make,querySelectorAll:s=>s==='.table-hand .card'?cards:s==='[data-combo-count]'?modes():s==='[data-edition]'?['original','party','zombie'].map(edition=>{const b=make('edition-'+edition);b.dataset={edition};return b}):[]},sessionStorage:{getItem:k=>k==='kk-id'?PLAYER:null,setItem(){}},localStorage:{getItem:()=>null,setItem(){}},location:{origin:'https://example.test',pathname:navigation.pathname??'/',search:navigation.search??''},URLSearchParams,setInterval(){},setTimeout(fn,ms){timers.push({fn,ms})},requestAnimationFrame(){},innerWidth:1200,innerHeight:900});
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
   const room={code:'ABC234',host:PLAYER,mode,phase:'playing',turn:0,owed:1,remaining:30,discard:[],log:[],players:[{id:PLAYER,name:'Me',alive:true,count:hand.length,hand},{id:'player-1',name:'Friend',alive:true,count:5}]};
   vm.runInContext('room='+JSON.stringify(room)+';render()',context);
@@ -228,4 +228,15 @@ test('Imploding option is host-only, guests see status, and face-up pile shows t
  vm.runInContext("room.host='player-1';last='';render()",s.context);assert.ok(s.node('#controls').innerHTML.includes('内爆猫：开启'));
  vm.runInContext("room.phase='playing';room.topFaceUp=true;room.host=id;room.pending=true;room.pendingType='implode';last='';render()",s.context);
  assert.ok(s.node('#app').innerHTML.includes('/art/implode.jpg'));assert.ok(s.node('#response').innerHTML.includes('正面放回'));assert.equal(vm.runInContext("availableTypes().includes('implode')",s.context),false);
+});
+
+test('Zombie edition has its own box and guide; dead NOW cards remain selectable',()=>{
+ const s=selection(['shufflenow'],'zombie');vm.runInContext("room=null;location.pathname='/play';landing()",s.context);s.node('edition-zombie').onclick();assert.ok(s.node('#app').innerHTML.includes('/art/zombiebox.png'));
+ let opened=false;s.node('#modeGuide').showModal=()=>opened=true;vm.runInContext('openModeGuide()',s.context);assert.equal(opened,true);assert.ok(s.node('#guideLink').href.includes('ek-zomb-english.pdf'));assert.ok(s.node('#guideNotes').innerHTML.includes('只有同种猫咪牌'));
+ vm.runInContext("room={code:'ABC234',host:id,mode:'zombie',phase:'playing',turn:1,owed:1,remaining:20,discard:[],log:[],players:[{id,name:'Me',alive:false,deadBomb:true,hand:['shufflenow'],count:1},{id:'player-1',name:'Other',alive:true,count:1}]};last='';render()",s.context);s.cards[0].onclick();assert.deepEqual(s.selected(),[0]);assert.ok(s.node('#selection').innerHTML.includes('Play card'));
+});
+test('variant artwork is used for hand, private peek and inspect without changing card type',()=>{
+ const s=selection(['skip','skip']);vm.runInContext("room.players[0].handArt=['skipv1','skipv2'];room.players[0].peek=['skip'];room.players[0].peekArt=['skipv3'];last='';render()",s.context);
+ assert.ok(s.node('#app').innerHTML.includes('/art/skipv1.jpg'));assert.ok(s.node('#app').innerHTML.includes('/art/skipv2.jpg'));assert.ok(s.node('#peekCards').innerHTML.includes('/art/skipv3.jpg'));s.cards[1].onclick();assert.deepEqual(s.selected(),[1]);assert.equal(s.modes().length,0);
+ s.node('#cardPreview').showModal=()=>{};vm.runInContext("inspectCard('skip','skipv2')",s.context);assert.equal(s.node('#previewImage').src,'/art/skipv2.jpg');
 });

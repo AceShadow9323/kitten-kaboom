@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Independent multiplayer kitten card game with Original and Party Pack modes",
+  "description": "Independent multiplayer kitten card game with Original, Party Pack and Zombie Kittens modes",
   "engines": {"node": ">=22.13.0 <25"},
   "scripts": {
     "start": "node server/index.mjs",

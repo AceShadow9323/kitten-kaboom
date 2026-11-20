@@ -1,3 +1,4 @@
+import {syncArtwork} from '../game/card-art.mjs';
 import {soundPreviewHTML} from '../game/sound-preview.mjs';
 import {turnPreviewHTML} from '../game/turn-alert.mjs';
 import {auditState,appendAudit} from './audit.mjs';
@@ -54,7 +55,7 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
       if(sound&&['GET','HEAD'].includes(req.method)){const key=sound[1]+'.mp3';let bytes=assets.get(key);if(!bytes){bytes=await readFile(new URL('../audio/'+key,import.meta.url));assets.set(key,bytes)}reply(res,200,req.method==='HEAD'?'':bytes,{'content-type':'audio/mpeg','cache-control':'public, max-age=86400'});return;}
       const previewFiles={'/preview/explosion':'explosion.html','/preview/explosion/':'explosion.html','/preview/cards':'cards.html','/preview/cards/':'cards.html'};
       if (Object.hasOwn(previewFiles,url.pathname) && ['GET','HEAD'].includes(req.method)) { const preview = await readFile(new URL('../previews/'+previewFiles[url.pathname],import.meta.url),'utf8'); reply(res,200,req.method==='HEAD'?'':preview,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'}); return; }
-      const artwork = /^\/art\/([a-z]+)\.(jpg|png)$/.exec(url.pathname);
+      const artwork = /^\/art\/([a-z0-9]+)\.(jpg|png)$/.exec(url.pathname);
       if (artwork && ['GET','HEAD'].includes(req.method)) {
         const assetName = artwork[1]+'.'+artwork[2];
         let bytes = assets.get(assetName);
@@ -78,10 +79,11 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
       if (path === '/api/create') {
         if (!name) throw new HttpError(400, 'Enter your nickname.');
         const mode = body.mode ?? 'original';
-        if (!['original','party'].includes(mode)) throw new HttpError(400, 'Choose Original or Party Pack.');
+        if (!['original','party','zombie'].includes(mode)) throw new HttpError(400, 'Choose Original, Party Pack, or Zombie Kittens.');
         for (let i=0; i<5; i++) {
           const code = [...randomBytes(6)].map(x=>ALPHABET[x % ALPHABET.length]).join('');
           const room = {code, host: token, mode, turnSeconds:30, phase: 'lobby', players: [{id:token, name, avatar:avatarId(body.avatar), ready:false}], log: [], rev: 0};
+          syncArtwork(room);
           if (await store.create(room)) { reply(res,200,view(room,token)); return; }
         }
         throw new HttpError(503, 'Could not create a room. Please try again.');
@@ -93,10 +95,11 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
         const member = room.players.some(p=>p.id === token);
         if (!member && path !== '/api/join') throw new HttpError(403, 'Join this room first.');
         if(path==='/api/logs')return {changed:false,reply:{version:1,code:room.code,events:room.auditLog??[]}};
+        const artworkChanged=syncArtwork(room);
         const before=auditState(room),sequence=room.logSequence??0,actor=room.players.find(p=>p.id===token)?.name;
         const requestId = path === '/api/move' ? body.requestId : undefined;
         if (requestId !== undefined && !TOKEN.test(requestId)) throw new HttpError(400, 'Invalid action identity.');
-        if (requestId && room.appliedMoves?.some(m=>m.token===token&&m.id===requestId)) return {changed:false,reply:view(room,token)};
+        if (requestId && room.appliedMoves?.some(m=>m.token===token&&m.id===requestId)) return {changed:artworkChanged,reply:view(room,token)};
         if (path === '/api/move' && body.roundId !== undefined && body.roundId !== room.roundId) throw new HttpError(409, 'The round changed. Refresh the table before playing.');
         if (path === '/api/move' && ['play','give'].includes(body.action) && body.handKey !== undefined && body.handKey !== JSON.stringify(room.players.find(p=>p.id===token)?.hand)) throw new HttpError(409, 'Your hand changed. Select your card again.');
         let changed = true;
@@ -115,7 +118,7 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
           if (room.host === token) room.host = room.players.find(p=>!p.bot)?.id ?? '';
         } else {
           const move = {...body};
-          if (['play','removebot'].includes(move.action) && /^player-\d+$/.test(move.target || '')) move.target = room.players[Number(move.target.split('-')[1])]?.id;
+          if (['play','removebot','revive'].includes(move.action) && /^player-\d+$/.test(move.target || '')) move.target = room.players[Number(move.target.split('-')[1])]?.id;
           // A click from an already completed draw step must not consume the next owed draw.
           if (move.action === 'draw' && move.drawKey !== undefined && move.drawKey !== drawKey(room)) changed = false;
           else { try { action(room, token, move); } catch (error) { throw new HttpError(400, error.message); } }
@@ -125,6 +128,7 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
           room.appliedMoves=room.appliedMoves.slice(-128);
           changed=true;
         }
+        if(changed)syncArtwork(room,body,token);else changed=artworkChanged;
         if (changed) {
           room.rev = (room.rev ?? 0) + 1;
           committedAudit=appendAudit(room,{before,sequence,actor,source:path==='/api/state'?'automatic':path==='/api/join'?'join':body.action});

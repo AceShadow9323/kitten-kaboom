@@ -1,6 +1,6 @@
 export function countdownPlan(previous,v,viewer,ms){
  const c=v?.turnClock;if(v?.phase!=='playing'||!c)return {state:null,cue:null};
- const stage=v.favor?'favor':v.alter?'alter':v.pending?'reinsert':'turn';
+ const stage=v.zombiePending?'zombie:'+v.zombiePending.stage+':'+v.zombiePending.remaining:v.collect?'collect:'+v.collect.kind+':'+v.collect.waiting[0]:v.dig?'dig':v.favor?'favor':v.alter?'alter':v.pending?'reinsert':'turn';
  const key=[v.code,v.roundId,v.drawKey,c.actor,stage].join(':');
  const state=previous?.key===key?{...previous}:{key,lowest:11};
  const second=Math.ceil(ms/1000);
