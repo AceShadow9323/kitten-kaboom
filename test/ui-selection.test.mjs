@@ -256,3 +256,28 @@ test('Clone can respond as Nope on its own turn when the physical top is Nope',(
 test('ordinary cat pair prefers real matching cats over spending a Clone',()=>{
  const s=selection(['decat','clone','decat'],'zombie');s.cards[0].onclick();assert.deepEqual(s.selected(),[0,2]);s.node('mode-2').onclick();assert.deepEqual(s.selected(),[0,2]);s.node('mode-3').onclick();assert.deepEqual(s.selected(),[0,2,1]);
 });
+
+test('lobby settings selected while another move is busy are saved instead of dropped',async()=>{
+ const s=selection(['skip']);vm.runInContext("room.phase='lobby';code=room.code;last='';render()",s.context);let release;const gate=new Promise(r=>release=r),calls=[];let state=JSON.parse(vm.runInContext('JSON.stringify(room)',s.context));
+ s.context.fetch=async(_,o)=>{const b=JSON.parse(o.body);calls.push(b);if(calls.length===1)await gate;if(b.action==='settings'){state.mode=b.mode??state.mode;state.turnSeconds=b.turnSeconds??state.turnSeconds}state.rev=(state.rev??0)+1;return {ok:true,json:async()=>structuredClone(state)}};
+ const first=vm.runInContext("move('ready')",s.context);vm.runInContext("changeRoomSettings({mode:'zombie'})",s.context);assert.equal(calls.length,1);release();await first;await new Promise(setImmediate);assert.equal(calls.length,2);assert.equal(calls[1].mode,'zombie');assert.equal(vm.runInContext('room.mode',s.context),'zombie');assert.equal(s.node('#lobbyMode').value,'zombie');
+});
+test('rapid lobby edits serialize and merge the latest mode and timer choices',async()=>{
+ const s=selection(['skip']);vm.runInContext("room.phase='lobby';code=room.code;last='';render()",s.context);let release;const gate=new Promise(r=>release=r),calls=[];let state=JSON.parse(vm.runInContext('JSON.stringify(room)',s.context));s.context.fetch=async(_,o)=>{const b=JSON.parse(o.body);calls.push(b);if(calls.length===1)await gate;Object.assign(state,{mode:b.mode??state.mode,turnSeconds:b.turnSeconds??state.turnSeconds,rev:(state.rev??0)+1});return {ok:true,json:async()=>structuredClone(state)}};
+ vm.runInContext("changeRoomSettings({mode:'original'});changeRoomSettings({mode:'party'});changeRoomSettings({mode:'zombie'});changeRoomSettings({turnSeconds:60})",s.context);assert.equal(calls.length,1);release();await new Promise(setImmediate);assert.equal(calls.length,2);assert.equal(calls[1].mode,'zombie');assert.equal(calls[1].turnSeconds,60);assert.equal(vm.runInContext('room.mode',s.context),'zombie');assert.equal(s.node('#turnSeconds').value,'60');
+});
+test('failed lobby setting leaves a persistent reason and restores the confirmed mode',async()=>{
+ const s=selection(['skip']);vm.runInContext("room.phase='lobby';code=room.code;last='';render()",s.context);s.context.fetch=async()=>({ok:false,status:400,json:async()=>({error:'Remove players until at most five'})});vm.runInContext("changeRoomSettings({mode:'zombie'})",s.context);await new Promise(setImmediate);assert.equal(s.node('#lobbyMode').value,'party');assert.match(s.node('#settingsStatus').textContent,/Remove players/);vm.runInContext("last='';render()",s.context);assert.match(s.node('#controls').innerHTML,/Remove players/);
+});
+test('lobby mode dropdown always marks exactly one edition selected',()=>{
+ for(const mode of ['original','party','zombie']){const s=selection(['skip'],mode);vm.runInContext("room.phase='lobby';last='';render()",s.context);const options=s.node('#controls').innerHTML.match(/id="lobbyMode">([\s\S]*?)<\/select>/)[1];assert.equal((options.match(/selected/g)||[]).length,1);assert.equal(s.node('#lobbyMode').value,mode)}
+});
+test('guest joining while host is using native mode dropdown does not replace that dropdown',async()=>{
+ const s=selection(['skip']);vm.runInContext("room.phase='lobby';code=room.code;last='';render()",s.context);const before=s.node('#app').innerHTML;const state=JSON.parse(vm.runInContext('JSON.stringify(room)',s.context));state.players.push({id:'player-2',name:'New friend'});state.rev=1;s.context.document.activeElement={matches:()=>true};s.context.fetch=async()=>({ok:true,json:async()=>state});await vm.runInContext('pollRoom()',s.context);assert.equal(s.node('#app').innerHTML,before);assert.equal(vm.runInContext('room.players.length',s.context),3);s.context.document.activeElement=null;s.node('#lobbyMode').onblur();assert.match(s.node('#app').innerHTML,/New friend/);
+});
+test('pending settings for an old room cannot be applied after switching rooms',async()=>{
+ const s=selection(['skip']);let calls=0;s.context.fetch=async()=>{calls++;throw Error('should not send')};vm.runInContext("room.phase='lobby';code=room.code;busy=true;changeRoomSettings({mode:'zombie'});room={...room,code:'XYZ234'};code=room.code;busy=false",s.context);await vm.runInContext('flushRoomSettings()',s.context);assert.equal(calls,0);
+});
+test('switching to Zombie supersedes queued incompatible Imploding and fast-game toggles',async()=>{
+ const s=selection(['skip']);vm.runInContext("room.phase='lobby';code=room.code;busy=true;changeRoomSettings({imploding:true,fast:true});changeRoomSettings({mode:'zombie'})",s.context);const queued=JSON.parse(vm.runInContext('JSON.stringify(pendingRoomSettings.patch)',s.context));assert.equal(queued.mode,'zombie');assert.equal(queued.imploding,false);assert.equal(queued.fast,false);
+});

@@ -7,7 +7,7 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {html} from '../game/ui.mjs';
-import {action, view, advanceBots, maxPlayers, drawKey} from '../game/game.mjs';
+import {action, view, advanceBots, maxPlayers, drawKey, resetLobby} from '../game/game.mjs';
 import {HttpError} from './storage.mjs';
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Z2-9]{6}$/;
@@ -108,14 +108,16 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
           if (member) changed = false;
           else {
             if (!name) throw new HttpError(400, 'Enter your nickname.');
-            if (room.phase !== 'lobby') throw new HttpError(400, 'This game has already started.');
+            if (room.phase !== 'lobby') throw new HttpError(400,room.phase==='finished'?'This round has finished. Ask the host to click Play again to reopen the lobby.':'This game has already started.');
             if (room.players.length >= maxPlayers(room)) throw new HttpError(400, 'This room is full.');
             room.players.push({id: token, name, avatar:avatarId(body.avatar), ready:false});
+            if(!room.players.some(p=>p.id===room.host&&!p.bot))room.host=room.players.find(p=>!p.bot).id;
           }
         } else if (body.action === 'leave') {
           if (room.phase === 'playing') throw new HttpError(400, 'Finish this round or request an end-round vote before leaving.');
           room.players = room.players.filter(p=>p.id !== token);
           if (room.host === token) room.host = room.players.find(p=>!p.bot)?.id ?? '';
+          if(!room.players.some(p=>!p.bot)){room.players=[];room.host='';resetLobby(room)}
         } else {
           const move = {...body};
           if (['play','removebot','revive'].includes(move.action) && /^player-\d+$/.test(move.target || '')) move.target = room.players[Number(move.target.split('-')[1])]?.id;
