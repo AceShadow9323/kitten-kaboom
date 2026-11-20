@@ -221,3 +221,11 @@ test('countdown arc reaches half and zero, disappearing completely at zero',()=>
  vm.runInContext("room.turnClock.remaining=0;updateTurnClock()",s.context);
  assert.equal(arc.style.strokeDashoffset,'100');assert.equal(arc.style.visibility,'hidden');assert.equal(badge.textContent,0);
 });
+
+test('Imploding option is host-only, guests see status, and face-up pile shows the actual card',()=>{
+ const s=selection(['defuse']);vm.runInContext("room.phase='lobby';room.imploding=true;last='';render()",s.context);
+ assert.ok(s.node('#controls').innerHTML.includes('id="imploding" checked'));assert.equal(typeof s.node('#imploding').onchange,'function');
+ vm.runInContext("room.host='player-1';last='';render()",s.context);assert.ok(s.node('#controls').innerHTML.includes('内爆猫：开启'));
+ vm.runInContext("room.phase='playing';room.topFaceUp=true;room.host=id;room.pending=true;room.pendingType='implode';last='';render()",s.context);
+ assert.ok(s.node('#app').innerHTML.includes('/art/implode.jpg'));assert.ok(s.node('#response').innerHTML.includes('正面放回'));assert.equal(vm.runInContext("availableTypes().includes('implode')",s.context),false);
+});

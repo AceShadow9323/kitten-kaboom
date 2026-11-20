@@ -262,3 +262,13 @@ test('recorded card auditions serve only the three bundled MP3s and retain sourc
  const head=await fetch(base+'/sound/cardtake1.mp3',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
  const page=await (await fetch(base+'/preview/sounds')).text();assert.ok(page.includes('Taking playing card'));assert.ok(page.includes('OxidVideos'));assert.ok(page.includes('加大'));assert.ok(page.includes("prepareCard(button.dataset.type)"));
 });
+
+test('same successful card request emits one synchronized recording event to every player',async t=>{
+ const {call,store}=await setup(t),a=randomUUID(),b=randomUUID();const {code}=(await call('/api/create',a,{name:'A'})).data;await call('/api/join',b,{code,name:'B'});
+ await call('/api/move',a,{code,action:'settings',turnSeconds:0});for(const who of [a,b])await call('/api/move',who,{code,action:'ready'});await call('/api/move',a,{code,action:'start'});
+ await store.withRoom(code,r=>{r.players[0].hand=['shuffle','skip'];r.players[1].hand=[];r.deck=['skip','boom'];return {changed:true,reply:null}});
+ const move={code,action:'play',index:0,requestId:randomUUID()};await call('/api/move',a,move);await call('/api/move',a,move);
+ const own=(await call('/api/state?code='+code,a)).data,other=(await call('/api/state?code='+code,b)).data;
+ assert.equal(own.cardPlays.length,1);assert.equal(other.cardPlays.length,1);assert.equal(own.cardPlays[0].id,other.cardPlays[0].id);assert.equal(other.cardPlays[0].actor,'player-0');
+ assert.ok(!JSON.stringify(other.cardPlays).includes(a));
+});

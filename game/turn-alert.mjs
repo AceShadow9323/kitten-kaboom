@@ -40,11 +40,11 @@ document.querySelectorAll('[data-sound]').forEach(button=>button.onclick=async()
 
 export const TURN_SOUND_CLIENT=playTurnTone.toString()+String.raw`
 let turnSoundContext=null,turnSoundEnabled=localStorage.getItem('kk-turn-sound')!=='off';
-function unlockTurnAudio(){if(!turnSoundEnabled)return;try{const Audio=globalThis.AudioContext||globalThis.webkitAudioContext;if(!Audio)return;turnSoundContext??=new Audio();if(turnSoundContext.state==='suspended')turnSoundContext.resume().catch(()=>{})}catch{}}
+function unlockTurnAudio(){if(!turnSoundEnabled)return;try{const Audio=globalThis.AudioContext||globalThis.webkitAudioContext;if(!Audio)return;turnSoundContext??=new Audio();if(turnSoundContext.state!=='running')turnSoundContext.resume().catch(()=>{});void prepareGameplayCardAudio()}catch{}}
 document.addEventListener?.('pointerdown',unlockTurnAudio,{capture:true,passive:true});
 document.addEventListener?.('click',unlockTurnAudio,{capture:true});
 document.addEventListener?.('keydown',event=>{if(event.key==='Enter'||event.key===' ')unlockTurnAudio()},{capture:true});
-function toggleTurnSound(){turnSoundEnabled=!turnSoundEnabled;try{localStorage.setItem('kk-turn-sound',turnSoundEnabled?'on':'off')}catch{}if(turnSoundEnabled)unlockTurnAudio();document.querySelectorAll('[data-turn-sound]').forEach(button=>{button.textContent='声音：'+(turnSoundEnabled?'开':'关');button.setAttribute('aria-pressed',String(turnSoundEnabled))})}
+function toggleTurnSound(){turnSoundEnabled=!turnSoundEnabled;try{localStorage.setItem('kk-turn-sound',turnSoundEnabled?'on':'off')}catch{}if(turnSoundEnabled)unlockTurnAudio();else stopGameplaySounds();document.querySelectorAll('[data-turn-sound]').forEach(button=>{button.textContent='声音：'+(turnSoundEnabled?'开':'关');button.setAttribute('aria-pressed',String(turnSoundEnabled))})}
 function notifyOwnArrival(previous,current){
  if(!previous||!current||current.actor!==id||current.phase!=='playing'||!current.startedAt||current.startedAt===previous.startedAt||!turnSoundEnabled||!turnSoundContext)return;
  const expected=current;

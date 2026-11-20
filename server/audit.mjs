@@ -4,7 +4,7 @@ export function auditState(room) {
  return {phase:room.phase,mode:room.mode??'original',turn:room.turn??null,
    turnName:room.players[room.turn]?.name??null,owed:room.owed??0,
    remaining:room.deck?.length??0,attacked:!!room.attacked,
-   pendingDefuse:!!room.pending,nopeCount:room.stack?.nopes??null,
+   imploding:!!room.imploding,faceUpTop:room.deck?.[0]==='implodeup',pendingDefuse:!!room.pending&&room.pendingKind!=='implode',pendingImploding:!!room.pending&&room.pendingKind==='implode',nopeCount:room.stack?.nopes??null,
    waiting:room.endVote?'vote':room.stack?'nope':room.favor?'favor':room.alter?'alter':room.pending?'reinsert':null,
    players:room.players.map((p,index)=>({index,name:p.name,alive:p.alive!==false,count:p.hand?.length??0}))};
 }
