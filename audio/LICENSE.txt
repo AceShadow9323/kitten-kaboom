@@ -1,0 +1,15 @@
+Card-recording adaptations for Kitten Kaboom
+Source creator: OxidVideos on Pixabay
+Obtained 2026-11-20.
+cardtake1.mp3: Taking playing card
+https://pixabay.com/sound-effects/film-special-effects-taking-playing-card-522520/
+cardtake2.mp3: Taking playing card - 2
+https://pixabay.com/sound-effects/film-special-effects-taking-playing-card-2-522516/
+cardtake3.mp3: Taking playing card 3
+https://pixabay.com/sound-effects/film-special-effects-taking-playing-card-3-522513/
+Pixabay Content License:
+https://pixabay.com/service/license-summary/
+https://pixabay.com/service/terms/
+Adaptations: mono resampling, filtering, transient compression, brief fades and output limiting for in-game use and game-effect audition.
+These recordings remain subject to the Pixabay Content License, not an unrestricted project code license. Do not redistribute them as standalone stock/audio-library content.
+No Envato previews or licensed originals have been copied.

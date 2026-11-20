@@ -50,6 +50,8 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
       if (['/','/play','/play/'].includes(url.pathname) && ['GET', 'HEAD'].includes(req.method)) { reply(res, 200, req.method === 'HEAD' ? '' : html, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache'}); return; }
       if (['/preview/turn','/preview/turn/'].includes(url.pathname)&&['GET','HEAD'].includes(req.method)) { reply(res,200,req.method==='HEAD'?'':turnPreviewHTML,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'});return; }
       if (['/preview/sounds','/preview/sounds/'].includes(url.pathname)&&['GET','HEAD'].includes(req.method)) { reply(res,200,req.method==='HEAD'?'':soundPreviewHTML,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'});return; }
+      const sound=/^\/sound\/(cardtake[123])\.mp3$/.exec(url.pathname);
+      if(sound&&['GET','HEAD'].includes(req.method)){const key=sound[1]+'.mp3';let bytes=assets.get(key);if(!bytes){bytes=await readFile(new URL('../audio/'+key,import.meta.url));assets.set(key,bytes)}reply(res,200,req.method==='HEAD'?'':bytes,{'content-type':'audio/mpeg','cache-control':'public, max-age=86400'});return;}
       const previewFiles={'/preview/explosion':'explosion.html','/preview/explosion/':'explosion.html','/preview/cards':'cards.html','/preview/cards/':'cards.html'};
       if (Object.hasOwn(previewFiles,url.pathname) && ['GET','HEAD'].includes(req.method)) { const preview = await readFile(new URL('../previews/'+previewFiles[url.pathname],import.meta.url),'utf8'); reply(res,200,req.method==='HEAD'?'':preview,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'}); return; }
       const artwork = /^\/art\/([a-z]+)\.(jpg|png)$/.exec(url.pathname);

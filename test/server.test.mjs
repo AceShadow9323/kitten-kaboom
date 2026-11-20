@@ -250,7 +250,15 @@ test('turn notification preview serves four sound options and avatar animation i
 
 test('countdown and card sound previews are separate, click-to-play and leave game audio unchanged',async t=>{
  const {base}=await setup(t);
- for(const path of ['/preview/sounds','/preview/sounds/']){const response=await fetch(base+path);assert.equal(response.status,200);const text=await response.text();assert.equal((text.match(/data-group="countdown"/g)||[]).length,3);assert.equal((text.match(/data-group="card"/g)||[]).length,3);assert.ok(text.includes('停止试听'));assert.ok(!text.includes('fetch('));assert.ok(!text.includes('autoplay'))}
+ for(const path of ['/preview/sounds','/preview/sounds/']){const response=await fetch(base+path);assert.equal(response.status,200);const text=await response.text();assert.equal((text.match(/data-group="countdown"/g)||[]).length,3);assert.equal((text.match(/data-group="card"/g)||[]).length,3);assert.ok(text.includes('停止试听'));assert.ok(!text.includes("fetch('/api/"));assert.ok(!text.includes('autoplay'))}
  const head=await fetch(base+'/preview/sounds',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
  const live=await (await fetch(base+'/play')).text();assert.ok(!live.includes('function previewSound('));assert.ok(live.includes("playTurnTone(turnSoundContext,'arcade',.38)"));
+});
+
+test('recorded card auditions serve only the three bundled MP3s and retain source credit',async t=>{
+ const {base}=await setup(t);
+ for(const id of [1,2,3]){const r=await fetch(base+'/sound/cardtake'+id+'.mp3');assert.equal(r.status,200);assert.equal(r.headers.get('content-type'),'audio/mpeg');assert.ok((await r.arrayBuffer()).byteLength>1000)}
+ assert.equal((await fetch(base+'/sound/cardtake4.mp3')).status,404);
+ const head=await fetch(base+'/sound/cardtake1.mp3',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+ const page=await (await fetch(base+'/preview/sounds')).text();assert.ok(page.includes('Taking playing card'));assert.ok(page.includes('OxidVideos'));assert.ok(page.includes('加大'));assert.ok(page.includes("prepareCard(button.dataset.type)"));
 });
