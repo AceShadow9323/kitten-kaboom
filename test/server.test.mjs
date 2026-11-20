@@ -241,3 +241,9 @@ test('audit does not expose private cards, deck order, player tokens or reinsert
  const serialized=JSON.stringify(data);for(const secret of [a,b,'rainbowcat','meloncat','beardcat','handKey','position','authorization'])assert.ok(!serialized.includes(secret),secret);
  const before=data.events.length;await call('/api/state?code='+code,b);assert.equal((await call('/api/logs?code='+code,b)).data.events.length,before);
 });
+
+test('turn notification preview serves four sound options and avatar animation independently of a room',async t=>{
+ const {base}=await setup(t);
+ for(const path of ['/preview/turn','/preview/turn/']){const res=await fetch(base+path);assert.equal(res.status,200);const page=await res.text();assert.ok(page.includes('柔和双叮'));assert.ok(page.includes('轻快木琴'));assert.ok(page.includes('turn-rays-out'));assert.ok(page.includes('只看头像动画'))}
+ const head=await fetch(base+'/preview/turn',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+});
