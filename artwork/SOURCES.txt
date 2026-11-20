@@ -128,3 +128,5 @@ electrocat variant 1: https://explodi.ng/images/cards/cat-card/artworks/Electroc
 lanterncat variant 1: https://explodi.ng/images/cards/cat-card/artworks/Cat-O-Lantern.jpg
 vampirecat variant 1: https://explodi.ng/images/cards/cat-card/artworks/Vampire-Cat.jpg
 implode variant 1: https://explodi.ng/images/cards/imploding-kitten/artworks/Imploding-Kitten.jpg
+
+Zombie Kittens angled box (replaces front view): https://www.explodingkittens.com/cdn/shop/files/EKG-ZOMB_Box_LeftQuarter_1400x1400_d4990cc0-e4c1-4dea-9fc4-7e727476f664_800x.png?v=1691442561
