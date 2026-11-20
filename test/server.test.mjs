@@ -247,3 +247,10 @@ test('turn notification preview serves four sound options and avatar animation i
  for(const path of ['/preview/turn','/preview/turn/']){const res=await fetch(base+path);assert.equal(res.status,200);const page=await res.text();assert.ok(page.includes('柔和双叮'));assert.ok(page.includes('轻快木琴'));assert.ok(page.includes('turn-rays-out'));assert.ok(page.includes('只看头像动画'))}
  const head=await fetch(base+'/preview/turn',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
 });
+
+test('countdown and card sound previews are separate, click-to-play and leave game audio unchanged',async t=>{
+ const {base}=await setup(t);
+ for(const path of ['/preview/sounds','/preview/sounds/']){const response=await fetch(base+path);assert.equal(response.status,200);const text=await response.text();assert.equal((text.match(/data-group="countdown"/g)||[]).length,3);assert.equal((text.match(/data-group="card"/g)||[]).length,3);assert.ok(text.includes('停止试听'));assert.ok(!text.includes('fetch('));assert.ok(!text.includes('autoplay'))}
+ const head=await fetch(base+'/preview/sounds',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+ const live=await (await fetch(base+'/play')).text();assert.ok(!live.includes('function previewSound('));assert.ok(live.includes("playTurnTone(turnSoundContext,'arcade',.38)"));
+});

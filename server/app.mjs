@@ -1,3 +1,4 @@
+import {soundPreviewHTML} from '../game/sound-preview.mjs';
 import {turnPreviewHTML} from '../game/turn-alert.mjs';
 import {auditState,appendAudit} from './audit.mjs';
 import {avatarId} from '../game/avatars.mjs';
@@ -48,6 +49,7 @@ export function createApp({store, trustProxy = false, rateLimit = true, auditSin
       }
       if (['/','/play','/play/'].includes(url.pathname) && ['GET', 'HEAD'].includes(req.method)) { reply(res, 200, req.method === 'HEAD' ? '' : html, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache'}); return; }
       if (['/preview/turn','/preview/turn/'].includes(url.pathname)&&['GET','HEAD'].includes(req.method)) { reply(res,200,req.method==='HEAD'?'':turnPreviewHTML,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'});return; }
+      if (['/preview/sounds','/preview/sounds/'].includes(url.pathname)&&['GET','HEAD'].includes(req.method)) { reply(res,200,req.method==='HEAD'?'':soundPreviewHTML,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'});return; }
       const previewFiles={'/preview/explosion':'explosion.html','/preview/explosion/':'explosion.html','/preview/cards':'cards.html','/preview/cards/':'cards.html'};
       if (Object.hasOwn(previewFiles,url.pathname) && ['GET','HEAD'].includes(req.method)) { const preview = await readFile(new URL('../previews/'+previewFiles[url.pathname],import.meta.url),'utf8'); reply(res,200,req.method==='HEAD'?'':preview,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache'}); return; }
       const artwork = /^\/art\/([a-z]+)\.(jpg|png)$/.exec(url.pathname);
