@@ -34,3 +34,36 @@ test('nested Clairvoyance response windows finish before secret insertion, and C
 test('responses cannot accidentally target a newly interrupted or restored Nope window',()=>{
  const r=make();r.players[0].hand=['attack'];r.players[1].hand=['nope'];r.players[2].hand=['shufflenow'];action(r,'a',{action:'play',index:0},100);const first=r.stack.id;action(r,'c',{action:'play',index:0},101);assert.notEqual(r.stack.id,first);assert.throws(()=>action(r,'b',{action:'allow',stackId:first},102),/changed/);action(r,'b',{action:'allow',stackId:r.stack.id},103);assert.equal(r.stack.id,first);
 });
+
+test('Clone singleton copies physical top action and never consumes a cat in the hand',()=>{
+ for(const [top,owed] of [['skip',1],['superskip',4],['attack',1],['peek',1],['dig',1],['favor',1],['shufflenow',1]]){
+  const r=make();r.discard=[top];r.owed=owed;r.players[0].hand=['clone','decat'];r.players[1].hand=['skip'];action(r,'a',{action:'play',indices:[0],target:'b',cloneKey:JSON.stringify([1,top])},100);assert.deepEqual(r.players[0].hand,['decat'],top);assert.equal(r.discard.at(-1),'clone');
+  if(top==='skip'||top==='superskip'||top==='attack')assert.equal(r.turn,1,top);else assert.equal(r.turn,0,top);
+  if(top==='attack')assert.equal(r.owed,2);if(top==='peek')assert.deepEqual(r.players[0].peek,['skip','boom','peek']);if(top==='favor')assert.equal(r.favor.target,'b');if(top==='dig')assert.equal(r.dig.actor,'a');
+ }
+});
+test('Clone copy rejects empty pile, another Clone, another player cat, dead and off-turn use',()=>{
+ for(const top of [null,'clone','decat','electrocat','lanterncat','vampirecat','boom']){const r=make();r.discard=top?[top]:[];r.players[0].hand=['clone'];assert.throws(()=>action(r,'a',{action:'play',index:0},100));assert.deepEqual(r.players[0].hand,['clone'])}
+ for(const off of [true,false]){const r=make();r.discard=['skip'];r.players[0].hand=['clone'];if(off)r.turn=1;else r.players[0].alive=false;assert.throws(()=>action(r,'a',{action:'play',index:0},100));assert.deepEqual(r.players[0].hand,['clone'])}
+});
+test('Clone source changes reject stale clicks even when the newest discard has the same title',()=>{
+ const r=make();r.players[0].hand=['clone'];r.discard=['skip','skip'];assert.throws(()=>action(r,'a',{action:'play',index:0,cloneKey:JSON.stringify([1,'skip'])},100),/changed/);assert.deepEqual(r.players[0].hand,['clone']);assert.equal(r.turn,0);
+});
+test('Clone copies Zombie Kitten only upon drawing a bomb, revives a dead player and returns both bombs',()=>{
+ const r=make();r.players[0].hand=['clone','decat'];r.discard=['zombie'];r.players[2].alive=false;r.players[2].deadBomb=true;r.players[2].hand=['nope'];r.deck=['boom','skip','peek'];assert.throws(()=>action(r,'a',{action:'play',index:0},90));action(r,'a',{action:'draw'},100);action(r,'a',{action:'zombieuse',useClone:true},101);assert.deepEqual(r.players[0].hand,['decat']);assert.equal(r.discard.at(-1),'clone');action(r,'a',{action:'revive',target:'c'},102);action(r,'a',{action:'reinsert',position:1},103);action(r,'a',{action:'reinsert',position:0},104);assert.ok(r.players[2].alive);assert.deepEqual(r.players[2].hand,['nope']);assert.equal(r.deck.filter(x=>x==='boom').length,2);assert.equal(r.turn,1);
+});
+test('Clone as Nope retains a response window after the last real Nope has been used',()=>{
+ const r=make();r.players[0].hand=['attack','clone'];r.players[1].hand=['nope'];action(r,'a',{action:'play',index:0},100);action(r,'b',{action:'nope'},101);assert.ok(r.stack,'must wait for the current player Clone response');assert.equal(r.stack.nopes,1);action(r,'a',{action:'play',index:0,stackId:r.stack.id},102);assert.equal(r.stack.nopes,2);advanceBots(r,10000);assert.equal(r.turn,1);assert.equal(r.owed,2);assert.deepEqual(r.discard,['attack','nope','clone']);
+});
+test('Clone cat combos ignore top action requirements, still require same cat kind and at most one Clone',()=>{
+ for(const top of ['feeddead','clair','attackdead','clone']){const r=make();r.discard=[top];r.players[0].hand=['clone','decat'];r.players[1].hand=['skip'];action(r,'a',{action:'play',indices:[0,1],target:'b'},100);assert.deepEqual(r.discard,[top,'decat','clone']);assert.deepEqual(r.players[0].hand,['skip']);assert.equal(r.turn,0)}
+ for(const cards of [['clone','clone'],['clone','decat','electrocat'],['clone','attack']]){const r=make();r.players[0].hand=cards;assert.throws(()=>action(r,'a',{action:'play',indices:cards.map((_,i)=>i),target:'b'},100));assert.deepEqual(r.players[0].hand,cards)}
+});
+test('client payload cannot forge the copied card or NOW permission',()=>{
+ const r=make();r.players[0].hand=['clone'];r.discard=['peek'];action(r,'a',{action:'play',index:0,zombieEffective:'superskip'},100);assert.equal(r.turn,0);assert.ok(r.players[0].peek);const t=make();t.players[1].alive=false;t.players[1].hand=['attack'];assert.throws(()=>action(t,'b',{action:'play',index:0,zombieNow:true},100));assert.deepEqual(t.players[1].hand,['attack']);
+});
+test('Clone follows copied dead-dependent card rules and cannot use NOW outside its own turn',()=>{
+ for(const top of ['attackdead','grave','feeddead']){const r=make();r.players[0].hand=['clone'];r.discard=[top];assert.throws(()=>action(r,'a',{action:'play',index:0,target:'b'},100),/Dead/);assert.deepEqual(r.players[0].hand,['clone'])}
+ const r=make();r.players[2].alive=false;r.players[2].deadBomb=true;r.players[2].hand=['skip'];r.players[0].hand=['clone'];r.discard=['attackdead'];action(r,'a',{action:'play',index:0},100);assert.equal(r.turn,1);assert.equal(r.owed,3);
+ for(const top of ['shufflenow','feeddead','clair']){const t=make();t.players[1].hand=['clone'];t.discard=[top];assert.throws(()=>action(t,'b',{action:'play',index:0},100),/living turn/);assert.deepEqual(t.players[1].hand,['clone'])}
+});

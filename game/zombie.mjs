@@ -66,8 +66,10 @@ export function zombiePrepare(r,p,b,now,h){
  if(indices.length>1&&indices.some(i=>p.hand[i]==='clone')){if(indices.filter(i=>p.hand[i]==='clone').length>1)throw Error('A Clone cannot copy another Clone.');b.indices=[...indices.filter(i=>p.hand[i]!=='clone'),...indices.filter(i=>p.hand[i]==='clone')]}
  if(indices.length===1&&p.hand[indices[0]]==='clone'){
   if(!p.alive||r.players[r.turn].id!==p.id)throw Error('Clone can only be played on your living turn.');
+  if(b.cloneKey!==undefined&&b.cloneKey!==JSON.stringify([r.discard.length,r.discard.at(-1)]))throw Error('The top discard changed. Select Clone again.');
   const copied=r.discard.at(-1);if(!copied||['clone','zombie','boom','implodeup','implode'].includes(copied))throw Error('Clone needs an eligible card on top of the discard pile.');
   if(copied==='nope'&&r.stack){if(now>=r.stack.deadline||b.stackId!==undefined&&b.stackId!==r.stack.id)throw Error('This response window has closed.');p.hand.splice(indices[0],1);r.discard.push('clone');h.cardPlay(r,p.id);r.stack.nopes++;r.stack.passed=[];r.stack.deadline=now+8000;h.visualEvent(r,'nope',p.id,r.stack.actor);h.say(r,p.name+' played Clone as Nope.');return true}
+  if(ZOMBIE_CATS.includes(copied))throw Error('Clone cannot pair with another player’s discarded Cat Card. Choose a Cat Card from your own hand for a combo.');
   b.zombieEffective=copied;
  }
  const c=b.zombieEffective??p.hand[indices[0]];

@@ -8,3 +8,6 @@ test('drawing and giving a duplicate preserve the specific artwork; public view 
  r.turn=0;r.players[0].hand=['skip','skip'];r.players[1].hand=[];r.favor={actor:'b',target:'a'};syncArtwork(r);const chosen=playerArtwork(r,'a').handArt[0];action(r,'a',{action:'give',index:0},200);syncArtwork(r,{action:'give',index:0},'a');assert.equal(playerArtwork(r,'b').handArt[0],chosen);assert.ok(!('deck' in artworkView(r,'b')));assert.ok(!('handArt' in artworkView(r,'b')));
  const all=Object.values(r.cardArt.zones).flat();assert.equal(new Set(all.map(c=>c.uid)).size,all.length);
 });
+test('Clone combo preserves physical cat identity when request order puts Clone before a duplicate cat',()=>{
+ const r=room();r.mode='zombie';r.players[0].hand=['clone','decat','decat'];r.players[1].hand=[];r.discard=['peek'];syncArtwork(r);const before=structuredClone(r.cardArt.zones['hand:a']);const move={action:'play',indices:[0,1],target:'b'};action(r,'a',move,100);syncArtwork(r,move,'a');assert.equal(r.cardArt.zones['hand:a'][0].uid,before[2].uid);assert.equal(r.cardArt.zones.discard.at(-2).uid,before[1].uid);assert.equal(r.cardArt.zones.discard.at(-1).uid,before[0].uid);assert.deepEqual(move.indices,[0,1]);
+});

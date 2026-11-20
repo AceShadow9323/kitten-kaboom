@@ -240,3 +240,19 @@ test('variant artwork is used for hand, private peek and inspect without changin
  assert.ok(s.node('#app').innerHTML.includes('/art/skipv1.jpg'));assert.ok(s.node('#app').innerHTML.includes('/art/skipv2.jpg'));assert.ok(s.node('#peekCards').innerHTML.includes('/art/skipv3.jpg'));s.cards[1].onclick();assert.deepEqual(s.selected(),[1]);assert.equal(s.modes().length,0);
  s.node('#cardPreview').showModal=()=>{};vm.runInContext("inspectCard('skip','skipv2')",s.context);assert.equal(s.node('#previewImage').src,'/art/skipv2.jpg');
 });
+
+test('Clone defaults to copying the discard instead of silently selecting a hand cat',()=>{
+ const s=selection(['clone','decat','decat'],'zombie');vm.runInContext("room.discard=['skip'];last='';render()",s.context);s.cards[0].onclick();assert.deepEqual(s.selected(),[0]);assert.ok(s.node('#selection').innerHTML.includes('复制 Skip →'));assert.ok(s.node('#selection').innerHTML.includes('弃牌堆顶：Skip'));s.node('mode-2').onclick();assert.deepEqual(s.selected(),[0,1]);s.node('mode-1').onclick();assert.deepEqual(s.selected(),[0]);
+});
+test('cat auto-match does not silently spend Clone; its combo is an explicit choice',()=>{
+ const s=selection(['decat','clone'],'zombie');s.cards[0].onclick();assert.deepEqual(s.selected(),[0]);s.node('mode-2').onclick();assert.deepEqual(s.selected(),[0,1]);
+});
+test('Clone cat combo does not inherit Feed Dead or Clairvoyance requirements from discard',()=>{
+ for(const top of ['feeddead','attackdead','grave','clair']){const s=selection(['clone','decat'],'zombie');vm.runInContext('room.discard='+JSON.stringify([top])+";last='';render()",s.context);s.cards[0].onclick();s.node('mode-2').onclick();const text=s.node('#selection').innerHTML;assert.ok(text.includes('Play 2 cards →'),top);assert.ok(text.includes('Choose a player'),top);assert.ok(!text.includes('需要至少一名死者'),top)}
+});
+test('Clone can respond as Nope on its own turn when the physical top is Nope',()=>{
+ const s=selection(['clone'],'zombie');vm.runInContext("room.discard=['attack','nope'];room.stack={id:'window',actor:id,card:'attack',kind:'single',nopes:1,passed:[],deadline:9999999999999};last='';render()",s.context);assert.ok(s.node('#response').innerHTML.includes('Clone → Nope'));assert.equal(typeof s.node('#nope').onclick,'function');
+});
+test('ordinary cat pair prefers real matching cats over spending a Clone',()=>{
+ const s=selection(['decat','clone','decat'],'zombie');s.cards[0].onclick();assert.deepEqual(s.selected(),[0,2]);s.node('mode-2').onclick();assert.deepEqual(s.selected(),[0,2]);s.node('mode-3').onclick();assert.deepEqual(s.selected(),[0,2,1]);
+});

@@ -10,7 +10,7 @@ export function syncArtwork(r,move={},actor){
  const moved=[];if(same&&r.drawSequence>(previous.drawSequence??0)&&old.deck?.length&&!(move.action==='digchoose'&&move.choice==='keep')){const bottom=(r.visualEvents??[]).some(e=>e.seq>(previous.visualSeq??0)&&e.type==='bottom');moved.push(...old.deck.splice(bottom?old.deck.length-1:0,1))}if(shuffled&&old.deck)for(let i=old.deck.length-1;i>0;i--){const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1);[old.deck[i],old.deck[j]]=[old.deck[j],old.deck[i]]}const hand=old['hand:'+actor]??[];if(['give','contribute'].includes(move.action)&&Number.isInteger(Number(move.index))&&hand[Number(move.index)])moved.push(...hand.splice(Number(move.index),1));
  const indices=move.indices??(move.index!==undefined?[Number(move.index)]:[]);
  if(move.action==='play'||move.action==='nope'||move.action==='zombieuse'){
-  let removed=indices;
+  let removed=r.mode==='zombie'&&indices.length>1?[...indices].sort((a,b)=>Number(hand[a]?.type==='clone')-Number(hand[b]?.type==='clone')):indices;
   if(move.action==='nope')removed=[hand.findIndex(c=>c.type==='nope')];
   if(move.action==='zombieuse')removed=[hand.findIndex(c=>c.type===(move.useClone?'clone':hand.some(c=>c.type==='zombie')?'zombie':'clone'))];
   const start=old.discard?.length??0;removed.forEach((i,n)=>fix('discard',start+n,hand[i]));
