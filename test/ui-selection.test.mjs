@@ -204,3 +204,20 @@ test('browser audit backup deduplicates polls, excludes private state and surviv
  vm.runInContext("saveGameLog(auditInput);saveGameLog(auditInput);room=null;code=null;location.pathname='/play';landing()",s.context);
  const saved=JSON.parse(storage.get('kk-public-game-logs-v1'));assert.equal(saved.ABC234.events.length,1);assert.ok(!JSON.stringify(saved).includes('PRIVATE_CARD'));assert.ok(!JSON.stringify(saved).includes('SECRET_FUTURE'));assert.ok(s.node('#app').innerHTML.includes('导出上次牌局日志'));
 });
+
+test('selected C notification plays once only for this player and respects mute',()=>{
+ const s=selection(['skip']),sounds=[];s.context.captureSound=type=>sounds.push(type);
+ vm.runInContext("turnSoundContext={state:'running'};playTurnTone=(_,type)=>captureSound(type);const now=Date.now();const previous={code:room.code,roundId:'r1',phase:'playing',actor:'player-1',startedAt:now-100,until:now+750};turnArrival={...previous,actor:id,startedAt:now};notifyOwnArrival(previous,turnArrival);notifyOwnArrival(turnArrival,turnArrival)",s.context);
+ assert.deepEqual(sounds,['arcade']);
+ vm.runInContext("turnArrival={...turnArrival,actor:'player-1',startedAt:Date.now()+1};notifyOwnArrival({startedAt:0},turnArrival);turnSoundEnabled=false;turnArrival={...turnArrival,actor:id};notifyOwnArrival({startedAt:0},turnArrival)",s.context);
+ assert.deepEqual(sounds,['arcade']);
+});
+test('countdown arc reaches half and zero, disappearing completely at zero',()=>{
+ const s=selection(['skip']),arc={style:{}},badge={setAttribute(){}};
+ const clock={classList:{toggle(){}},querySelector:selector=>selector==='.clock-progress'?arc:badge};
+ s.context.document.querySelectorAll=selector=>selector==='.has-clock'?[clock]:[];
+ vm.runInContext("clockOffset=0;room.turnClock={actor:id,seconds:30,paused:true,remaining:15000};updateTurnClock()",s.context);
+ assert.equal(arc.style.strokeDashoffset,'50');assert.equal(arc.style.visibility,'visible');
+ vm.runInContext("room.turnClock.remaining=0;updateTurnClock()",s.context);
+ assert.equal(arc.style.strokeDashoffset,'100');assert.equal(arc.style.visibility,'hidden');assert.equal(badge.textContent,0);
+});

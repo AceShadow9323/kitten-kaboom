@@ -19,9 +19,9 @@ test('four distinct short sound options have bounded gain and scheduled oscillat
  assert.equal(SOUND_NAMES.length,4);assert.ok(stops.every(at=>at<1));assert.ok(delays.every(ms=>ms<1200));assert.ok(nodes.filter(n=>n.disconnected).every(n=>n.gain.value<=.3));
  assert.ok(new Set(frequencies).size>=7);assert.ok(gains.every(v=>v<=.5));
 });
-test('preview is click-to-play; live game includes arrival rays but no sound activation',()=>{
+test('preview is click-to-play; live game includes arrival rays and selected C sound behind gesture unlock',()=>{
  assert.equal((turnRaysMarkup().match(/<g /g)||[]).length,16);
  for(const [type]of SOUND_NAMES)assert.ok(turnPreviewHTML.includes('data-sound="'+type+'"'));
  assert.ok(turnPreviewHTML.includes('await audio.resume()'));assert.ok(!turnPreviewHTML.includes('autoplay'));assert.ok(!turnPreviewHTML.includes('fetch('));
- assert.ok(html.includes('turn-arriving'));assert.ok(!html.includes('AudioContext'));assert.ok(!html.includes('playTurnTone('));
+ assert.ok(html.includes('turn-arriving'));assert.ok(html.includes('notifyOwnArrival'));assert.ok(html.includes("playTurnTone(turnSoundContext,'arcade',.38)"));assert.ok(html.includes('current.actor!==id'));
 });
